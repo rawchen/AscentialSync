@@ -1,5 +1,9 @@
 package com.lundong.ascentialsync.util;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
 /**
  * @author RawChen
  * @date 2023-03-03 17:44
@@ -14,7 +18,7 @@ public class StringUtil {
 	 * 部门转换
 	 * 1正式 2实习 3外包 4劳务 5顾问 6离职 7试用
 	 * A:正式 B:离职 C:试用期
-	 *
+	 * <p>
 	 * 飞书管理后台->组织架构->成员字段管理
 	 * 需要新增自定义人员类型字段离职和试用
 	 *
@@ -111,5 +115,16 @@ public class StringUtil {
 				.replaceAll("\"brand\"", "\"品牌\"")
 				.replaceAll("\"deptNumber\"", "\"部门编号\"");
 		return json;
+	}
+
+	public static byte[] readInputStream(InputStream inputStream) throws IOException {
+		byte[] buffer = new byte[1024];
+		int len = 0;
+		ByteArrayOutputStream bos = new ByteArrayOutputStream();
+		while ((len = inputStream.read(buffer)) != -1) {
+			bos.write(buffer, 0, len);
+		}
+		bos.close();
+		return bos.toByteArray();
 	}
 }

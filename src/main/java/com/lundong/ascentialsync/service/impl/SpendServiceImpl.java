@@ -8,6 +8,7 @@ import com.lundong.ascentialsync.entity.ExcelHeader;
 import com.lundong.ascentialsync.service.SpendService;
 import com.lundong.ascentialsync.util.SftpUtil;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ import java.util.List;
  * @author RawChen
  * @date 2023-05-12 14:24
  */
+@Service
 public class SpendServiceImpl implements SpendService {
 	@Override
 	@Scheduled(cron = "0 0 1 ? * *")

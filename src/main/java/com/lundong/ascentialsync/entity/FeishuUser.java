@@ -45,4 +45,10 @@ public class FeishuUser {
     @JSONField(name = "job_title")
     private String jobTitle;
     private String deptName;
+
+    /**
+     * 自定义字段
+     */
+    private String costCenterCode;
+    private String companyCode;
 }

@@ -8,7 +8,7 @@ import lombok.Data;
  * @date 2023-03-06 15:16
  */
 @Data
-public class ExcelUser implements Comparable<ExcelUser> {
+public class ExcelUser {
 
 	@ExcelProperty(index = 0)
 	private String employeeId;
@@ -19,19 +19,7 @@ public class ExcelUser implements Comparable<ExcelUser> {
 	@ExcelProperty(index = 2)
 	private String costCenter;
 
-	@ExcelProperty(index = 4)
-	private String ManagerId;
+//	@ExcelProperty(index = 4)
+//	private String ManagerId;
 
-
-
-
-	@Override
-	public int compareTo(ExcelUser o) {
-		String str = o.getEmployeeId().replace("/", "");
-		if (employeeId.length() > str.length()) {
-			return 0;
-		} else {
-			return 1;
-		}
-	}
 }

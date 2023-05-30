@@ -6,6 +6,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.lundong.ascentialsync.config.Constants;
+import com.lundong.ascentialsync.entity.CustomAttr;
 import com.lundong.ascentialsync.entity.FeishuDept;
 import com.lundong.ascentialsync.entity.FeishuSpendVoucher;
 import com.lundong.ascentialsync.entity.FeishuUser;
@@ -15,6 +16,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.net.HttpCookie;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author RawChen
@@ -374,5 +376,289 @@ public class SignUtil {
 	public static List<FeishuSpendVoucher>spendVouchers() {
 		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
 		return spendVouchers(accessToken);
+	}
+
+	/**
+	 * 更新飞书用户只能定义字段：公司编码、成本中心编码
+	 *
+	 * @return
+	 */
+	public static boolean updateFeishuUser(FeishuUser user, String companyCodeAttrId, String costCenterCodeAttrId) {
+		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		return updateFeishuUser(accessToken, user, companyCodeAttrId, costCenterCodeAttrId);
+	}
+
+	/**
+	 * 更新飞书用户只能定义字段：公司编码、成本中心编码
+	 *
+	 * @param accessToken
+	 * @return
+	 */
+	public static boolean updateFeishuUser(String accessToken, FeishuUser user, String companyCodeAttrId, String costCenterCodeAttrId) {
+		Map<String, Object> param = new HashMap<>();
+//		param.put("user_id_type", "user_id");
+//		param.put("department_id_type", "department_id");
+		JSONObject object = new JSONObject();
+		String json = "[{\"type\":\"TEXT\",\"id\":\"companyCodeId\",\"value\": {\"text\": \"companyCodeText\"}},{\"type\":\"TEXT\",\"id\":\"costCenterCodeId\",\"value\": {\"text\": \"costCenterCodeText\"}}]";
+		json = json.replaceAll("companyCodeId", companyCodeAttrId);
+		json = json.replaceAll("costCenterCodeId", costCenterCodeAttrId);
+		json = json.replaceAll("companyCodeText", user.getCompanyCode());
+		json = json.replaceAll("costCenterCodeText", user.getCostCenterCode());
+		object.put("custom_attrs", JSONArray.parseArray(json));
+		String resultStr = HttpRequest.patch("https://open.feishu.cn/open-apis/contact/v3/users/" + user.getUserId() + "?user_id_type=user_id&department_id_type=department_id")
+				.header("Authorization", "Bearer " + accessToken)
+				.form(param)
+				.body(object.toJSONString())
+				.execute()
+				.body();
+		System.out.println(resultStr);
+		JSONObject jsonObject = JSONObject.parseObject(resultStr);
+		if ("0".equals(jsonObject.getString("code"))) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/**
+	 * 获取自定义字段列表
+	 *
+	 * @return
+	 */
+	public static List<CustomAttr> getCustomAttrs() {
+		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		return getCustomAttrs(accessToken);
+	}
+
+	/**
+	 * 获取自定义字段列表
+	 *
+	 * @param accessToken
+	 * @return
+	 */
+	public static List<CustomAttr> getCustomAttrs(String accessToken) {
+		List<CustomAttr> customAttrList = new ArrayList<>();
+		Map<String, Object> param = new HashMap<>();
+		param.put("page_size", "100");
+		String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/contact/v3/custom_attrs")
+				.header("Authorization", "Bearer " + accessToken)
+				.form(param)
+				.execute()
+				.body();
+		JSONObject jsonObject = JSONObject.parseObject(resultStr);
+		if ("0".equals(jsonObject.getString("code"))) {
+			JSONObject dataJsonObject = jsonObject.getJSONObject("data");
+			if (dataJsonObject != null) {
+				JSONArray items = dataJsonObject.getJSONArray("items");
+				if (items != null) {
+
+					for (int i = 0; i < items.size(); i++) {
+						String id = items.getJSONObject(i).getString("id");
+						String type = items.getJSONObject(i).getString("type");
+						CustomAttr customAttr = CustomAttr.builder()
+								.id(id)
+								.type(type)
+								.build();
+						JSONArray i18n = items.getJSONObject(i).getJSONArray("i18n_name");
+						for (int j = 0; j < i18n.size(); j++) {
+							if ("default".equals(i18n.getJSONObject(j).getString("locale"))) {
+								customAttr.setValue(i18n.getJSONObject(j).getString("value"));
+								break;
+							}
+						}
+						customAttrList.add(customAttr);
+
+					}
+				}
+
+			}
+		}
+		return customAttrList;
+	}
+
+	/**
+	 * 获取飞书用户
+	 *
+	 * @param accessToken
+	 * @return
+	 */
+	public static FeishuUser getFeishuUser(String accessToken, String userId) {
+		List<CustomAttr> customAttrList = getCustomAttrs();
+
+		Map<String, Object> param = new HashMap<>();
+		param.put("user_id_type", "user_id");
+		param.put("department_id_type", "department_id");
+		FeishuUser feishuUser = new FeishuUser();
+		String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/contact/v3/users/" + userId)
+				.header("Authorization", "Bearer " + accessToken)
+				.form(param)
+				.execute()
+				.body();
+//		System.out.println(resultStr);
+		JSONObject jsonObject = JSONObject.parseObject(resultStr);
+		if ("0".equals(jsonObject.getString("code"))) {
+			JSONObject user = jsonObject.getJSONObject("data").getJSONObject("user");
+			if (user != null) {
+				// userId jobTitle
+				feishuUser.setUserId(user.getString("user_id"));
+				feishuUser.setEmployeeNo(user.getString("employee_no"));
+				// customAttrs
+				JSONArray customAttrs = user.getJSONArray("custom_attrs");
+				for (int i = 0; i < customAttrs.size(); i++) {
+					String id = customAttrs.getJSONObject(i).getString("id");
+//					System.out.println("id:" + id);
+					for (int j = 0; j < customAttrList.size(); j++) {
+						CustomAttr customAttr = customAttrList.get(j);
+//						System.out.println("customAttr:" + customAttr);
+						if (customAttr.getId().equals(id) && "Company Code".equals(customAttr.getValue())) {
+							feishuUser.setCompanyCode(customAttrs.getJSONObject(i).getJSONObject("value").getString("text"));
+							break;
+						}
+						if (customAttr.getId().equals(id) && "Cost Center Code".equals(customAttr.getValue())) {
+							feishuUser.setCostCenterCode(customAttrs.getJSONObject(i).getJSONObject("value").getString("text"));
+							break;
+						}
+					}
+				}
+			}
+			return feishuUser;
+		} else {
+			return null;
+		}
+	}
+
+	/**
+	 * 获取飞书用户
+	 *
+	 * @return
+	 */
+	public static FeishuUser getFeishuUser(String userId) {
+		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		return getFeishuUser(accessToken, userId);
+	}
+
+	/**
+	 * 飞书（标准版）获取花名册信息
+	 *
+	 * @param accessToken
+	 * @return
+	 */
+	public static List<FeishuUser> getFeishuEmployees(String accessToken) {
+		List<FeishuUser> feishuEmployees = new ArrayList<>();
+		Map<String, Object> param = new HashMap<>();
+
+//		优化：将view改为base，匹配需要同步的员工id具体为哪些，再传值user_ids精确查询员工full全字段列表
+//		if (employeeNoList != null) {
+//			// 解析员工编号为userId编号并传为user_ids，形如user_ids=xxxx&user_ids=xxxxx
+//			param.put("user_ids", );
+//		}
+		param.put("view", "full");
+		param.put("user_id_type", "user_id");
+		param.put("page_size", "100");
+		while (true) {
+			String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/ehr/v1/employees")
+					.header("Authorization", "Bearer " + accessToken)
+					.form(param)
+					.execute()
+					.body();
+//			System.out.println(resultStr);
+			JSONObject jsonObject = JSON.parseObject(resultStr);
+			if (jsonObject != null && "0".equals(jsonObject.getString("code"))) {
+				// 获取到100个员工
+				JSONObject data = (JSONObject) jsonObject.get("data");
+				JSONArray items = (JSONArray) data.get("items");
+				for (int i = 0; i < items.size(); i++) {
+					// 构造飞书用户
+					FeishuUser feishuUser = new FeishuUser();
+					feishuUser.setUserId(items.getJSONObject(i).getString("user_id"));
+					JSONObject systemFields = items.getJSONObject(i).getJSONObject("system_fields");
+					feishuUser.setEmployeeNo(systemFields.getString("employee_no"));
+					JSONArray customFields = items.getJSONObject(i).getJSONArray("custom_fields");
+					for (int j = 0; j < customFields.size(); j++) {
+						if ("Company Code".equals(customFields.getJSONObject(j).getString("label"))) {
+							feishuUser.setCompanyCode(customFields.getJSONObject(j).getString("value"));
+							break;
+						}
+					}
+					for (int j = 0; j < customFields.size(); j++) {
+						if ("Cost Center Code".equals(customFields.getJSONObject(j).getString("label"))) {
+							feishuUser.setCostCenterCode(customFields.getJSONObject(j).getString("value"));
+							break;
+						}
+					}
+					feishuEmployees.add(feishuUser);
+				}
+
+				if ((boolean) data.get("has_more")) {
+					param.put("page_token", data.getString("page_token"));
+				} else {
+					break;
+				}
+			}
+		}
+		return feishuEmployees;
+	}
+
+	/**
+	 * 飞书（标准版）获取花名册信息
+	 *
+	 * @return
+	 */
+	public static List<FeishuUser> getFeishuEmployees() {
+		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		return getFeishuEmployees(accessToken);
+	}
+
+	/**
+	 * 飞书（标准版）获取花名册基础信息
+	 *
+	 * @param accessToken
+	 * @return
+	 */
+	public static List<FeishuUser> getFeishuBaseEmployees(String accessToken) {
+		List<FeishuUser> feishuEmployees = new ArrayList<>();
+		Map<String, Object> param = new HashMap<>();
+		param.put("view", "basic");
+		param.put("user_id_type", "user_id");
+		param.put("page_size", "100");
+		while (true) {
+			String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/ehr/v1/employees")
+					.header("Authorization", "Bearer " + accessToken)
+					.form(param)
+					.execute()
+					.body();
+			JSONObject jsonObject = JSON.parseObject(resultStr);
+			if (jsonObject != null && "0".equals(jsonObject.getString("code"))) {
+				// 获取到100个员工
+				JSONObject data = (JSONObject) jsonObject.get("data");
+				JSONArray items = (JSONArray) data.get("items");
+				for (int i = 0; i < items.size(); i++) {
+					// 构造飞书用户
+					FeishuUser feishuUser = new FeishuUser();
+					feishuUser.setUserId(items.getJSONObject(i).getString("user_id"));
+					JSONObject systemFields = items.getJSONObject(i).getJSONObject("system_fields");
+					feishuUser.setEmployeeNo(systemFields.getString("employee_no"));
+					feishuEmployees.add(feishuUser);
+				}
+
+				if ((boolean) data.get("has_more")) {
+					param.put("page_token", data.getString("page_token"));
+				} else {
+					break;
+				}
+			}
+		}
+		feishuEmployees = feishuEmployees.stream().filter(e -> !e.getEmployeeNo().isEmpty()).collect(Collectors.toList());
+		return feishuEmployees;
+	}
+
+	/**
+	 * 飞书（标准版）获取花名册基础信息
+	 *
+	 * @return
+	 */
+	public static List<FeishuUser> getFeishuBaseEmployees() {
+		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		return getFeishuBaseEmployees(accessToken);
 	}
 }
