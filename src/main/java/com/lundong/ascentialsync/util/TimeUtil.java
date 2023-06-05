@@ -38,4 +38,19 @@ public class TimeUtil {
 					format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss+08:00"));
 		}
 	}
+
+	/**
+	 * 时间戳转yyyyMMddhms格式
+	 *
+	 * @param joinTime
+	 * @return
+	 */
+	public static String timestampToDate(String joinTime) {
+		try {
+			LocalDateTime localDateTime = LocalDateTimeUtil.of(Long.parseLong(joinTime));
+			return localDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+		} catch (NumberFormatException e) {
+			return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+		}
+	}
 }

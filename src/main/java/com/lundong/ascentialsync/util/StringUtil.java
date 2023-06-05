@@ -127,4 +127,42 @@ public class StringUtil {
 		bos.close();
 		return bos.toByteArray();
 	}
+
+	/**
+	 * 如果String为null则返回空串
+	 *
+	 * @param str
+	 * @return
+	 */
+	public static String nullIsEmpty(String str) {
+		if (str == null) {
+			return "";
+		} else {
+			return str;
+		}
+	}
+
+	public static String getZhCustomFie(String nameI18n) {
+		if (nameI18n == null) {
+			return "";
+		} else {
+			nameI18n = nameI18n.substring(nameI18n.indexOf("\"zh\":\"") + 6);
+			nameI18n = nameI18n.substring(0, nameI18n.indexOf("\""));
+			return nameI18n;
+		}
+	}
+
+	public static String taxRateFormat(String invoiceTaxRate) {
+		if (invoiceTaxRate == null) {
+			return "";
+		} else {
+			if (invoiceTaxRate.contains(".")) {
+				invoiceTaxRate = invoiceTaxRate.substring(0, invoiceTaxRate.indexOf("."));
+				invoiceTaxRate = invoiceTaxRate + "%";
+				return invoiceTaxRate;
+			} else {
+				return "";
+			}
+		}
+	}
 }

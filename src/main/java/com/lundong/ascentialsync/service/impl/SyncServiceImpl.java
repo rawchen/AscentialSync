@@ -69,7 +69,6 @@ public class SyncServiceImpl implements SyncService {
 				}
 			}
 		}
-		System.out.println("collect size:" + collect.size());
 		String companyCodeAttrId = "";
 		String costCenterCodeAttrId = "";
 		List<CustomAttr> customAttrList = SignUtil.getCustomAttrs();

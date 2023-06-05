@@ -6,15 +6,14 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.lundong.ascentialsync.config.Constants;
-import com.lundong.ascentialsync.entity.CustomAttr;
-import com.lundong.ascentialsync.entity.FeishuDept;
-import com.lundong.ascentialsync.entity.FeishuSpendVoucher;
-import com.lundong.ascentialsync.entity.FeishuUser;
+import com.lundong.ascentialsync.entity.*;
+import com.lundong.ascentialsync.entity.spend.SpendCustomField;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.net.HttpCookie;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -339,11 +338,12 @@ public class SignUtil {
 	 * @param accessToken
 	 * @return
 	 */
-	public static List<FeishuSpendVoucher>spendVouchers(String accessToken) {
+	public static List<FeishuSpendVoucher>spendVouchers(String accessToken, String formCode) {
 		List<FeishuSpendVoucher> vouchers = new ArrayList<>();
 		Map<String, Object> param = new HashMap<>();
 		while (true) {
 			param.put("page_size", 20);
+			param.put("form_code", formCode);
 			String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/spend/v1/vouchers/scroll")
 					.header("Authorization", "Bearer " + accessToken)
 					.form(param)
@@ -373,9 +373,60 @@ public class SignUtil {
 	 *
 	 * @return
 	 */
-	public static List<FeishuSpendVoucher>spendVouchers() {
+	public static List<FeishuSpendVoucher>spendVouchers(String formCode) {
 		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
-		return spendVouchers(accessToken);
+		return spendVouchers(accessToken, formCode);
+	}
+
+	/**
+	 * 获取表单列表
+	 *
+	 * @param accessToken
+	 * @param searchDate
+	 * @return
+	 */
+	public static List<FeishuSpendForm>spendForms(String accessToken, Date searchDate) {
+		List<FeishuSpendForm> forms = new ArrayList<>();
+		Map<String, Object> param = new HashMap<>();
+		param.put("page_size", 20);
+		if (searchDate != null) {
+			param.put("submit_start_time", new SimpleDateFormat("yyyy-MM-dd").format(searchDate));
+			param.put("submit_end_time", new SimpleDateFormat("yyyy-MM-dd").format(searchDate));
+		}
+		while (true) {
+			String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/spend/v1/forms")
+					.header("Authorization", "Bearer " + accessToken)
+					.form(param)
+					.execute()
+					.body();
+//			System.out.println(resultStr);
+			JSONObject jsonObject = JSON.parseObject(resultStr);
+			JSONObject data = (JSONObject) jsonObject.get("data");
+			JSONArray items = (JSONArray) data.get("items");
+			for (int i = 0; i < items.size(); i++) {
+				// 构造飞书费控凭证
+				FeishuSpendForm form = items.getJSONObject(i).toJavaObject(FeishuSpendForm.class);
+				forms.add(form);
+			}
+
+			if ((boolean) data.get("has_more")) {
+				param.put("page_token", data.getString("page_token"));
+			} else {
+				break;
+			}
+		}
+		return forms;
+	}
+
+	/**
+	 * 获取表单列表
+	 *
+	 * @param searchDate
+	 * @return
+	 */
+	public static List<FeishuSpendForm>spendForms(Date searchDate) {
+		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		return spendForms(accessToken, searchDate);
 	}
 
 	/**
@@ -504,22 +555,25 @@ public class SignUtil {
 				feishuUser.setEmployeeNo(user.getString("employee_no"));
 				// customAttrs
 				JSONArray customAttrs = user.getJSONArray("custom_attrs");
-				for (int i = 0; i < customAttrs.size(); i++) {
-					String id = customAttrs.getJSONObject(i).getString("id");
+				if (customAttrs != null) {
+					for (int i = 0; i < customAttrs.size(); i++) {
+						String id = customAttrs.getJSONObject(i).getString("id");
 //					System.out.println("id:" + id);
-					for (int j = 0; j < customAttrList.size(); j++) {
-						CustomAttr customAttr = customAttrList.get(j);
+						for (int j = 0; j < customAttrList.size(); j++) {
+							CustomAttr customAttr = customAttrList.get(j);
 //						System.out.println("customAttr:" + customAttr);
-						if (customAttr.getId().equals(id) && "Company Code".equals(customAttr.getValue())) {
-							feishuUser.setCompanyCode(customAttrs.getJSONObject(i).getJSONObject("value").getString("text"));
-							break;
-						}
-						if (customAttr.getId().equals(id) && "Cost Center Code".equals(customAttr.getValue())) {
-							feishuUser.setCostCenterCode(customAttrs.getJSONObject(i).getJSONObject("value").getString("text"));
-							break;
+							if (customAttr.getId().equals(id) && "Company Code".equals(customAttr.getValue())) {
+								feishuUser.setCompanyCode(customAttrs.getJSONObject(i).getJSONObject("value").getString("text"));
+								break;
+							}
+							if (customAttr.getId().equals(id) && "Cost Center Code".equals(customAttr.getValue())) {
+								feishuUser.setCostCenterCode(customAttrs.getJSONObject(i).getJSONObject("value").getString("text"));
+								break;
+							}
 						}
 					}
 				}
+
 			}
 			return feishuUser;
 		} else {
@@ -660,5 +714,45 @@ public class SignUtil {
 	public static List<FeishuUser> getFeishuBaseEmployees() {
 		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
 		return getFeishuBaseEmployees(accessToken);
+	}
+
+	/**
+	 * 飞书（费控）查询自定义纬度列表
+	 *
+	 * @param accessToken
+	 * @return
+	 */
+	public static List<SpendCustomField> getSpendCustomFields(String accessToken, String fieldCode) {
+		List<SpendCustomField> spendCustomFields = new ArrayList<>();
+		String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/spend/v1/custom_fields/" + fieldCode)
+				.header("Authorization", "Bearer " + accessToken)
+				.execute()
+				.body();
+		JSONObject jsonObject = JSON.parseObject(resultStr);
+		if (jsonObject != null && "0".equals(jsonObject.getString("code"))) {
+			JSONObject data = (JSONObject) jsonObject.get("data");
+			JSONArray items = (JSONArray) data.get("value_list");
+			for (int i = 0; i < items.size(); i++) {
+				// 构造飞书用户
+				SpendCustomField customField = new SpendCustomField();
+				customField.setCode(items.getJSONObject(i).getString("code"));
+				customField.setNameI18n(items.getJSONObject(i).getString("name_i18n"));
+				spendCustomFields.add(customField);
+			}
+		}
+		for (SpendCustomField spendCustomField : spendCustomFields) {
+			spendCustomField.setNameI18n(StringUtil.getZhCustomFie(spendCustomField.getNameI18n()));
+		}
+		return spendCustomFields;
+	}
+
+	/**
+	 * 飞书（费控）查询自定义纬度列表
+	 *
+	 * @return
+	 */
+	public static List<SpendCustomField> getSpendCustomFields(String fieldCode) {
+		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		return getSpendCustomFields(accessToken, fieldCode);
 	}
 }

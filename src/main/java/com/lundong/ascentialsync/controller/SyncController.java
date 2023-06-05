@@ -1,5 +1,6 @@
 package com.lundong.ascentialsync.controller;
 
+import com.lundong.ascentialsync.service.SpendService;
 import com.lundong.ascentialsync.service.SyncService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,8 +20,18 @@ public class SyncController {
 	@Autowired
 	SyncService syncService;
 
+	@Autowired
+	SpendService spendService;
+
 	@GetMapping("/syncStaff")
 	public void syncStaff() {
 		syncService.syncStaffData();
 	}
+
+	@GetMapping("/syncFormData")
+	public void syncFormData() {
+		spendService.syncFormData();
+	}
+
+
 }
