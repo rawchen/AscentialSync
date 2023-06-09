@@ -12,12 +12,15 @@ import com.lundong.ascentialsync.entity.FeishuUser;
 import com.lundong.ascentialsync.service.SyncService;
 import com.lundong.ascentialsync.util.SftpUtil;
 import com.lundong.ascentialsync.util.SignUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,6 +29,7 @@ import java.util.stream.Collectors;
  * @date 2023-05-12 14:24
  */
 @Service
+@Slf4j
 public class SyncServiceImpl implements SyncService {
 	@Override
 	@Scheduled(cron = "0 0 1 ? * *")
@@ -33,7 +37,10 @@ public class SyncServiceImpl implements SyncService {
 		SftpUtil sftpUtil = new SftpUtil(Constants.SFTP_USER_ID, Constants.SFTP_PASSWORD, Constants.SFTP_HOST, 22);
 		sftpUtil.login();
 		InputStream inputStream = sftpUtil.downloadStream("workday2feishu", "staff-" + LocalDateTimeUtil.format(LocalDate.now(), "yyyyMMdd") + ".csv");
-
+		if (inputStream == null) {
+			log.info("无该日期员工同步数据：{}", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+			return;
+		}
 		// SFTP用户Excel列表数据查询
 		List<ExcelUser> excelUsers = new ArrayList<>();
 		try {
@@ -41,7 +48,6 @@ public class SyncServiceImpl implements SyncService {
 				@Override
 				public void invoke(ExcelUser user, AnalysisContext context) {
 					excelUsers.add(user);
-					System.out.println(user);
 				}
 				@Override
 				public void doAfterAllAnalysed(AnalysisContext context) {
@@ -50,6 +56,8 @@ public class SyncServiceImpl implements SyncService {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+
+		log.info("需要同步的员工数: {}", excelUsers.size());
 
 		ArrayList<String> employeeNumbers = new ArrayList<>();
 		for (ExcelUser excelUser : excelUsers) {

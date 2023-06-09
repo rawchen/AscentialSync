@@ -13,6 +13,9 @@ public class SpendCustomField {
 	@JSONField(name = "code")
 	private String code;
 
-	@JSONField(name = "nameI18n")
+	@JSONField(name = "name_i18n")
 	private String nameI18n;
+
+	@JSONField(name = "is_valid")
+	private Boolean isValid;
 }

@@ -50,13 +50,13 @@ public class Allocation {
 	private String reimburseLineId;
 
 	@JSONField(name = "reimbursement_amount")
-	private Integer reimbursementAmount;
+	private Double reimbursementAmount;
 
 	@JSONField(name = "source_id")
 	private String sourceId;
 
 	@JSONField(name = "tax_amount")
-	private Integer taxAmount;
+	private Double taxAmount;
 
 	@JSONField(name = "tax_code")
 	private String taxCode;

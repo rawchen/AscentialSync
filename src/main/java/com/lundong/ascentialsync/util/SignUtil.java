@@ -8,6 +8,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.lundong.ascentialsync.config.Constants;
 import com.lundong.ascentialsync.entity.*;
 import com.lundong.ascentialsync.entity.spend.SpendCustomField;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
  * @author RawChen
  * @date 2023-03-08 18:37
  */
+@Slf4j
 public class SignUtil {
 
 	/**
@@ -145,7 +147,7 @@ public class SignUtil {
 		if (StringUtils.isNotEmpty(resultStr)) {
 			JSONObject resultObject = (JSONObject) JSON.parse(resultStr);
 			if (!"0".equals(resultObject.getString("code"))) {
-				System.out.println("批量插入失败：" + resultObject.getString("msg"));
+				log.info("批量插入失败：{}", resultObject.getString("msg"));
 				return new ArrayList<>();
 			} else {
 				JSONObject data = (JSONObject) resultObject.get("data");
@@ -186,7 +188,7 @@ public class SignUtil {
 	 * @param tableId
 	 */
 	public static void batchClearTable(String accessToken, List<String> recordIds, String appToken, String tableId) {
-		System.out.println("===开始批量删除 " + tableId + "===");
+		log.info("===开始批量删除 {} ===", tableId);
 		if (recordIds != null && recordIds.size() > 0) {
 			List<List<String>> partitions = ListUtils.partition(recordIds, 500);
 			for (List<String> partition : partitions) {
@@ -200,7 +202,7 @@ public class SignUtil {
 				if (StringUtils.isNotEmpty(resultStr)) {
 					JSONObject resultObject = (JSONObject) JSON.parse(resultStr);
 					if (!"0".equals(resultObject.getString("code"))) {
-						System.out.println("批量删除失败：" + resultObject.getString("msg"));
+						log.info("批量删除失败：{}", resultObject.getString("msg"));
 					}
 				}
 				try {
@@ -210,7 +212,7 @@ public class SignUtil {
 				}
 			}
 		}
-		System.out.println("===批量删除完成===");
+		log.info("===批量删除完成===");
 	}
 
 	/**
@@ -351,19 +353,28 @@ public class SignUtil {
 					.body();
 //			System.out.println(resultStr);
 			JSONObject jsonObject = JSON.parseObject(resultStr);
-			JSONObject data = (JSONObject) jsonObject.get("data");
-			JSONArray items = (JSONArray) data.get("items");
-			for (int i = 0; i < items.size(); i++) {
-				// 构造飞书费控凭证
-				FeishuSpendVoucher feishuDept = items.getJSONObject(i).toJavaObject(FeishuSpendVoucher.class);
-				vouchers.add(feishuDept);
+			if (!"0".equals(jsonObject.getString("code"))) {
+				log.info("获取凭证列表失败：{}", resultStr);
+				break;
 			}
+			JSONObject data = (JSONObject) jsonObject.get("data");
+			if (data != null) {
+				JSONArray items = (JSONArray) data.get("items");
+				for (int i = 0; i < items.size(); i++) {
+					// 构造飞书费控凭证
+					FeishuSpendVoucher feishuDept = items.getJSONObject(i).toJavaObject(FeishuSpendVoucher.class);
+					vouchers.add(feishuDept);
+				}
 
-			if ((boolean) data.get("has_more")) {
-				param.put("page_token", data.getString("page_token"));
+				if ((boolean) data.get("has_more")) {
+					param.put("page_token", data.getString("page_token"));
+				} else {
+					break;
+				}
 			} else {
 				break;
 			}
+
 		}
 		return vouchers;
 	}
@@ -390,8 +401,20 @@ public class SignUtil {
 		Map<String, Object> param = new HashMap<>();
 		param.put("page_size", 20);
 		if (searchDate != null) {
-			param.put("submit_start_time", new SimpleDateFormat("yyyy-MM-dd").format(searchDate));
-			param.put("submit_end_time", new SimpleDateFormat("yyyy-MM-dd").format(searchDate));
+			Date date = new Date();
+			Calendar calendar = new GregorianCalendar();
+			calendar.setTime(date);
+			calendar.add(Calendar.DATE, -10);
+			date = calendar.getTime();
+
+			Date endDate = new Date();
+			Calendar endCalendar = new GregorianCalendar();
+			endCalendar.setTime(endDate);
+			endCalendar.add(Calendar.DATE, -1);
+			endDate = endCalendar.getTime();
+
+			param.put("submit_start_time", new SimpleDateFormat("yyyy-MM-dd").format(date));
+			param.put("submit_end_time", new SimpleDateFormat("yyyy-MM-dd").format(endDate));
 		}
 		while (true) {
 			String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/spend/v1/forms")
@@ -462,7 +485,7 @@ public class SignUtil {
 				.body(object.toJSONString())
 				.execute()
 				.body();
-		System.out.println(resultStr);
+//		System.out.println(resultStr);
 		JSONObject jsonObject = JSONObject.parseObject(resultStr);
 		if ("0".equals(jsonObject.getString("code"))) {
 			return true;
@@ -737,12 +760,16 @@ public class SignUtil {
 				SpendCustomField customField = new SpendCustomField();
 				customField.setCode(items.getJSONObject(i).getString("code"));
 				customField.setNameI18n(items.getJSONObject(i).getString("name_i18n"));
+				customField.setIsValid(items.getJSONObject(i).getBoolean("is_valid"));
 				spendCustomFields.add(customField);
 			}
 		}
+		// 解析此格式：{\"zh\":\"61007030\"}
 		for (SpendCustomField spendCustomField : spendCustomFields) {
 			spendCustomField.setNameI18n(StringUtil.getZhCustomFie(spendCustomField.getNameI18n()));
 		}
+		// 过滤有效的
+		spendCustomFields = spendCustomFields.stream().filter(SpendCustomField::getIsValid).collect(Collectors.toList());
 		return spendCustomFields;
 	}
 

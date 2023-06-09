@@ -5,17 +5,21 @@ import com.lundong.ascentialsync.entity.spend.Allocation;
 import com.lundong.ascentialsync.entity.spend.InvoiceDetail;
 import com.lundong.ascentialsync.entity.spend.ReimburseData;
 import com.lundong.ascentialsync.entity.spend.SpendCustomField;
+import com.lundong.ascentialsync.enums.InvoiceTypeEnum;
 import com.lundong.ascentialsync.service.SpendService;
 import com.lundong.ascentialsync.util.ExcelUtil;
 import com.lundong.ascentialsync.util.SignUtil;
 import com.lundong.ascentialsync.util.StringUtil;
 import com.lundong.ascentialsync.util.TimeUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -26,6 +30,7 @@ import java.util.stream.Collectors;
  * @date 2023-05-12 14:24
  */
 @Service
+@Slf4j
 public class SpendServiceImpl implements SpendService {
 	/**
 	 * 每天定时同步昨天新增的差旅报销单和日常费用报销单，生成固定的csv文件到sftp的expfeishu2sap文件夹
@@ -37,7 +42,7 @@ public class SpendServiceImpl implements SpendService {
 		Date date = new Date();
 		Calendar calendar = new GregorianCalendar();
 		calendar.setTime(date);
-		calendar.add(Calendar.DATE, -3);
+		calendar.add(Calendar.DATE, -1);
 		date = calendar.getTime();
 
 		List<SpendCustomField> glAccountList = SignUtil.getSpendCustomFields("0000001");
@@ -46,12 +51,14 @@ public class SpendServiceImpl implements SpendService {
 
 		// 费控列表接口，先获取昨天添加到费控的表单列表
 		List<FeishuSpendForm> feishuSpendForms = SignUtil.spendForms(date);
-		System.out.println("表单数量: " + feishuSpendForms.size());
+		log.info("表单数量: {}", feishuSpendForms.size());
 		// 过滤掉
 		feishuSpendForms = feishuSpendForms.stream()
-				.filter(f -> f.getBizClsName().contains("差旅报销") || f.getBizClsName().contains("日常费用报销"))
+				.filter(f -> f.getBizUnitName().contains("员工差旅报销") || f.getBizUnitName().contains("员工日常报销"))
 				.collect(Collectors.toList());
-		System.out.println("过滤后表单数量: " + feishuSpendForms.size());
+		log.info("过滤后表单数量: {}", feishuSpendForms.size());
+//		feishuSpendForms = feishuSpendForms.stream().filter(f -> f.getFormCode().equals("TR23060600004")).collect(Collectors.toList());
+//		log.info("过滤后表单数量: {}", feishuSpendForms.size());
 		for (FeishuSpendForm form : feishuSpendForms) {
 			String employeeNo = "";
 			// 通过applicant_id(申请人ID)获取员工ID
@@ -68,7 +75,6 @@ public class SpendServiceImpl implements SpendService {
 				// 转换发起日期格式
 				Date submitTime;
 				Date approvedTime = new Date();
-
 				// 获取最新version的reimburse_data
 				ReimburseData reimburseData = null;
 				List<ReimburseData> reimburseDataList = feishuSpendVoucher.getReimburseData();
@@ -118,7 +124,7 @@ public class SpendServiceImpl implements SpendService {
 						String invoiceDetailBizTypeCode = "";
 						ExcelRecord record = ExcelRecord.builder()
 								.journalEntry("1")
-								.companyCode(StringUtil.nullIsEmpty(reimburseData.getCompanyCode()))
+								.companyCode("")
 								.glAccount("") //费用类型对应
 								.creditor(employeeNo)
 								.amountInTransactionCurrency(invoiceDetail.getGrossAmount())	// 区分含税和不含税
@@ -200,27 +206,126 @@ public class SpendServiceImpl implements SpendService {
 						}
 
 						// TODO recordNew.taxCode
-						// 读取发票信息，判断是否可抵扣
-						Boolean deductible = invoiceDetail.getDeductible();
-						if (deductible != null && deductible) { // 可抵扣
-							// 提取税率，提取对应SAP
-							String invoiceTaxRate = invoiceDetail.getInvoiceTaxRate();
-							if (invoiceTaxRate != null) {
-								// 转换税率为百分之 6.0000000000 -> 6%
-								invoiceTaxRate = StringUtil.taxRateFormat(invoiceTaxRate);
-
-								for (SpendCustomField taxCode : taxCodeList) {
-									if (taxCode.getNameI18n().startsWith(invoiceTaxRate + " input tax")) {
-										// 匹配值假如以“6% input tax”开头
-										recordNew.setTaxCode(taxCode.getCode());
+						// 税码
+						if (form.getBizUnitName().contains("员工日常报销")) {
+							recordNew.setTaxCode("J0");
+							// 修改税金为0和修改不含税金额为总金额
+							recordNew.setTaxAmount("0");
+							recordNew.setAmountInTransactionCurrency(invoiceDetail.getGrossAmount());
+						} else {
+							// 差旅报销
+							// 根据发票类型判断
+							InvoiceTypeEnum invoiceTypeEnum = InvoiceTypeEnum.getType(invoiceDetail.getInvoiceTypeCode());
+							if (invoiceTypeEnum != null) {
+								OUT:
+								switch (invoiceTypeEnum) {
+									case VAT_GENERAL_ELECTRIC:
+										if (invoiceDetailBizTypeCode != null) {
+											if ("1004".equals(invoiceDetailBizTypeCode)) {
+												// 差旅-地铁/公交/打车
+												// 提取税率，税额
+												String invoiceTaxRate = invoiceDetail.getInvoiceTaxRate();
+												if (invoiceTaxRate != null) {
+													invoiceTaxRate = StringUtil.taxRateFormat(invoiceTaxRate);
+													for (SpendCustomField taxCode : taxCodeList) {
+														if (taxCode.getNameI18n().toLowerCase().startsWith(invoiceTaxRate + " input vat")) {
+															recordNew.setTaxCode(taxCode.getCode());
+															break OUT;
+														}
+													}
+												}
+											} else {
+												// 否
+												recordNew.setTaxCode("J0");
+												// 修改税金为0和修改不含税金额为总金额
+												recordNew.setTaxAmount("0");
+												recordNew.setAmountInTransactionCurrency(invoiceDetail.getGrossAmount());
+											}
+										}
 										break;
-									}
+									case VAT:
+									case VAT_ELECTRIC:
+										String invoiceTaxRate = invoiceDetail.getInvoiceTaxRate();
+										if (invoiceTaxRate != null) {
+											invoiceTaxRate = StringUtil.taxRateFormat(invoiceTaxRate);
+											for (SpendCustomField taxCode : taxCodeList) {
+												if (taxCode.getNameI18n().toLowerCase().startsWith(invoiceTaxRate + " input vat")) {
+													recordNew.setTaxCode(taxCode.getCode());
+													break OUT;
+												}
+											}
+										}
+										break;
+									case PASSENGER_INVOICE:
+										// 客运发票
+										for (SpendCustomField taxCode : taxCodeList) {
+											if (taxCode.getNameI18n().toLowerCase().startsWith("3% input vat")) {
+												recordNew.setTaxCode(taxCode.getCode());
+												// 重新计算税额
+												// 不含税金额 = 全额 / (1+税率)
+												double grossAmount = Double.parseDouble(invoiceDetail.getGrossAmount());
+												BigDecimal calcResult = new BigDecimal(grossAmount);
+												calcResult = calcResult.divide(new BigDecimal("1.03"), 2, RoundingMode.HALF_UP);
+												recordNew.setAmountInTransactionCurrency(String.valueOf(calcResult));
+												// 税额 = 全额-不含税金额
+												recordNew.setTaxAmount(String.valueOf(new BigDecimal(grossAmount).subtract(calcResult)));
+												break OUT;
+											}
+										}
+										break;
+									case AIR_TICKET_ITINERARY:
+									case TRAIN_TICKET:
+										// 航空机票行程单/火车票
+										for (SpendCustomField taxCode : taxCodeList) {
+											if (taxCode.getNameI18n().toLowerCase().startsWith("9% input vat")) {
+												recordNew.setTaxCode(taxCode.getCode());
+												// 重新计算税额
+												// 不含税金额 = 全额 / (1+税率)
+												double grossAmount = Double.parseDouble(invoiceDetail.getGrossAmount());
+												BigDecimal calcResult = new BigDecimal(grossAmount);
+												calcResult = calcResult.divide(new BigDecimal("1.09"), 2, RoundingMode.HALF_UP);
+												recordNew.setAmountInTransactionCurrency(String.valueOf(calcResult));
+												// 税额 = 全额-不含税金额
+												recordNew.setTaxAmount(String.valueOf(new BigDecimal(grossAmount).subtract(calcResult)));
+												break OUT;
+											}
+										}
+										break;
+									default:
+										for (SpendCustomField taxCode : taxCodeList) {
+											if (taxCode.getNameI18n().toLowerCase().startsWith("0% vat")) {
+												recordNew.setTaxCode(taxCode.getCode());
+												// 修改税金为0和修改不含税金额为总金额
+												recordNew.setTaxAmount("0");
+												recordNew.setAmountInTransactionCurrency(invoiceDetail.getGrossAmount());
+												break;
+											}
+										}
 								}
 							}
-						} else {
-							// 不可抵扣
-							// 获取对应报销行的的费用类型
-							if (invoiceDetailBizTypeCode != null) {
+
+
+//							Boolean deductible = invoiceDetail.getDeductible();
+//							if (deductible != null && deductible) { // 可抵扣
+//								// 提取税率，提取对应SAP
+//								String invoiceTaxRate = invoiceDetail.getInvoiceTaxRate();
+//								if (invoiceTaxRate != null) {
+//									// 转换税率为百分之 6.0000000000 -> 6%
+//									invoiceTaxRate = StringUtil.taxRateFormat(invoiceTaxRate);
+//
+//									for (SpendCustomField taxCode : taxCodeList) {
+//										if (taxCode.getNameI18n().toLowerCase().startsWith(invoiceTaxRate + " input vat")) {
+//											// 匹配值假如以“6% input tax”开头
+//											recordNew.setTaxCode(taxCode.getCode());
+//											break;
+//										}
+//									}
+//								}
+//							} else {}
+
+
+								// 获取对应报销行的的费用类型
+//							if (invoiceDetailBizTypeCode != null) {
 //								String expenseTypeString = "";
 //								// 如果发票详情对应的分摊行费用类型不为空，匹配自定义维度
 //								for (SpendCustomField customField : expenseTypeList) {
@@ -230,52 +335,133 @@ public class SpendServiceImpl implements SpendService {
 //										break;
 //									}
 //								}
-								// 判断是否为可抵扣的交通类型发票
-								// 费用类型为
-								if ("1002".equals(invoiceDetailBizTypeCode) || "1003".equals(invoiceDetailBizTypeCode)) {
-									// 飞机， 火车/高铁
-									for (SpendCustomField taxCode : taxCodeList) {
-										if (taxCode.getNameI18n().startsWith("9% input deduction")) {
-											recordNew.setTaxCode(taxCode.getCode());
-											break;
-										}
-									}
-								} else if ("1004".equals(invoiceDetailBizTypeCode) || "4001".equals(invoiceDetailBizTypeCode)) {
-									// 差旅-地铁/公交/打车， 市内交通费
-									for (SpendCustomField taxCode : taxCodeList) {
-										if (taxCode.getNameI18n().startsWith("3% input deduction")) {
-											recordNew.setTaxCode(taxCode.getCode());
-											break;
-										}
-									}
-								} else {
-									// 其它费用类型
-									// 提取税率，提取对应SAP
-									String invoiceTaxRate = invoiceDetail.getInvoiceTaxRate();
-									if (invoiceTaxRate != null) {
-										invoiceTaxRate = StringUtil.taxRateFormat(invoiceTaxRate);
-										for (SpendCustomField taxCode : taxCodeList) {
-											if (taxCode.getNameI18n().startsWith(invoiceTaxRate + " input tax")) {
-												// 匹配值假如以“6% input tax”开头
-												recordNew.setTaxCode(taxCode.getCode());
-												break;
-											}
-										}
-									}
+
+//								if ("1002".equals(invoiceDetailBizTypeCode) || "1003".equals(invoiceDetailBizTypeCode)) {
+//									// 飞机， 火车/高铁
+//									for (SpendCustomField taxCode : taxCodeList) {
+//										if (taxCode.getNameI18n().toLowerCase().startsWith("9% input vat")) {
+//											recordNew.setTaxCode(taxCode.getCode());
+//											break;
+//										}
+//									}
+//								} else if ("1004".equals(invoiceDetailBizTypeCode) || "4001".equals(invoiceDetailBizTypeCode)) {
+//									// 差旅-地铁/公交/打车， 市内交通费
+//									for (SpendCustomField taxCode : taxCodeList) {
+//										if (taxCode.getNameI18n().toLowerCase().startsWith("3% input vat")) {
+//											recordNew.setTaxCode(taxCode.getCode());
+//											break;
+//										}
+//									}
+//								} else {
+//									// 其它费用类型
+//									// 提取税率，提取对应SAP
+//									String invoiceTaxRate = invoiceDetail.getInvoiceTaxRate();
+//									if (invoiceTaxRate != null) {
+//										invoiceTaxRate = StringUtil.taxRateFormat(invoiceTaxRate);
+//										for (SpendCustomField taxCode : taxCodeList) {
+//											if (taxCode.getNameI18n().toLowerCase().startsWith(invoiceTaxRate + " input vat")) {
+//												// 匹配值假如以“6% input tax”开头
+//												recordNew.setTaxCode(taxCode.getCode());
+//												break;
+//											}
+//										}
+//									}
+//								}
+//							}
+
+						}
+
+						excelRecords.add(record);
+						excelRecords.add(recordNew);
+					}
+
+					// 分摊行找不到发票的也要添加
+					List<Allocation> allocations = reimburseData.getAllocations();
+					List<Allocation> allocationList = new ArrayList<>();
+					for (Allocation allocation : allocations) {
+						boolean temp = false;
+						for (InvoiceDetail invoiceDetail : invoiceDetailList) {
+							if (invoiceDetail.getReimburseLineId().equals(allocation.getReimburseLineId())) {
+								// 说明报账行内至少存在一张发票
+								temp = true;
+								break;
+							}
+						}
+						if (!temp) {
+							allocationList.add(allocation);
+						}
+					}
+
+					// 遍历没有发票的分摊行列表
+					for (Allocation allocation : allocationList) {
+						ExcelRecord record = ExcelRecord.builder()
+								.journalEntry("1")
+								.companyCode("")
+								.glAccount("") //费用类型对应
+								.creditor(employeeNo)
+								.amountInTransactionCurrency(String.valueOf(allocation.getReimbursementAmount()))
+								.documentItemText("")
+								.debitCreditCode("")	// 借记代码
+								.wbsElement("")
+								.assignmentReference("")
+								.taxCode("") // 税码
+								.deliveryCentre("")
+								.build();
+
+						if (feishuUser != null && feishuUser.getCostCenterCode() != null) {
+							record.setCostCenter(feishuUser.getCostCenterCode());
+						} else {
+							record.setCostCenter("");
+						}
+						if (feishuUser != null && feishuUser.getCompanyCode() != null) {
+							record.setCompanyCode(feishuUser.getCompanyCode());
+						} else {
+							record.setCompanyCode("");
+						}
+
+						ExcelRecord recordNew = ExcelRecord.builder().build();
+						BeanUtils.copyProperties(record, recordNew);
+						record.setGlAccount("");
+						recordNew.setCreditor("");
+						record.setDocumentItemText("");
+						record.setDebitCreditCode("H");
+						recordNew.setDebitCreditCode("S");
+						record.setCostCenter("");
+						record.setWbsElement("");
+						record.setAssignmentReference("");
+						record.setTaxCode("");
+						record.setTaxAmount("");
+						record.setDeliveryCentre("");
+						recordNew.setTaxCode("J0");
+						recordNew.setAmountInTransactionCurrency(String.valueOf(allocation.getReimbursementAmount()));
+						recordNew.setTaxAmount("0");
+
+						String invoiceDetailBizTypeCode = allocation.getBizTypeCode();
+						// 自定义维度表取报销航备注（费用类型），GLaccount费用类型代码
+						if (invoiceDetailBizTypeCode != null) {
+							for (SpendCustomField customField : expenseTypeList) {
+								if (customField.getCode().equals(invoiceDetailBizTypeCode)) {
+									recordNew.setDocumentItemText(customField.getNameI18n());
+									break;
+								}
+							}
+							for (SpendCustomField customField : glAccountList) {
+								if (customField.getCode().equals(invoiceDetailBizTypeCode)) {
+									recordNew.setGlAccount(customField.getNameI18n());
+									break;
 								}
 							}
 						}
 
-						System.out.println(record);
-						System.out.println(recordNew);
 						excelRecords.add(record);
 						excelRecords.add(recordNew);
 					}
+
 				}
 
 				// 生成上传CSV到SFTP
 				try {
-					String fileName = employeeNo + "-" + TimeUtil.getTimestamp() + "-" +"TUTnew.csv";
+					String fileName = employeeNo + "_" + new SimpleDateFormat("ddMMyyyyHHmmss").format(new Date()) +".csv";
 //					SftpUtil sftpUtil = new SftpUtil(Constants.SFTP_USER_ID, Constants.SFTP_PASSWORD, Constants.SFTP_HOST, 22);
 //					sftpUtil.login();
 					ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -285,22 +471,21 @@ public class SpendServiceImpl implements SpendService {
 					ExcelUtil.generateCsv(header, excelRecords, baos);
 					FileOutputStream fos = new FileOutputStream("C:\\" + fileName);
 					//追加BOM标识
-					fos.write(0xef);
-					fos.write(0xbb);
-					fos.write(0xbf);
+//					fos.write(0xef);
+//					fos.write(0xbb);
+//					fos.write(0xbf);
 					fos.write(baos.toByteArray());
 					fos.close();
 
 //					sftpUtil.upload("expfeishu2sap", fileName, baos.toByteArray());
-					System.out.println("生成CSV文件：" + fileName);
+					log.info("生成CSV文件：{}", fileName);
 					baos.close();
 				} catch (Exception e) {
-
 					throw new RuntimeException(e);
 				}
 			}
 		}
-		System.out.println("生成文件结束");
+		log.info("生成文件结束");
 	}
 
 	/**

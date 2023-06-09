@@ -27,6 +27,9 @@ public class InvoiceDetail {
 	@JSONField(name = "deductible_tax_amount")
 	private String deductibleTaxAmount;
 
+	/**
+	 * 不含税金额
+	 */
 	@JSONField(name = "exclude_tax_amount")
 	private String excludeTaxAmount;
 
