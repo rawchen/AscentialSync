@@ -453,6 +453,77 @@ public class SignUtil {
 	}
 
 	/**
+	 * 获取凭证列表
+	 *
+	 * @param accessToken
+	 * @param searchDate
+	 * @return
+	 */
+	public static List<FeishuSpendVoucher>spendFormsWithTimestamp(String accessToken, Date searchDate) {
+		List<FeishuSpendVoucher> vouchers = new ArrayList<>();
+		Map<String, Object> param = new HashMap<>();
+		param.put("page_size", 20);
+		if (searchDate != null) {
+//			Date date = new Date();
+//			Calendar calendar = new GregorianCalendar();
+//			calendar.setTime(date);
+//			calendar.add(Calendar.DATE, -10);
+//			date = calendar.getTime();
+//
+//			Date endDate = new Date();
+//			Calendar endCalendar = new GregorianCalendar();
+//			endCalendar.setTime(endDate);
+//			endCalendar.add(Calendar.DATE, -1);
+//			endDate = endCalendar.getTime();
+
+			param.put("index_time_after", TimeUtil.getDailyStartTime(searchDate));
+			param.put("index_time_before", TimeUtil.getDailyEndTime(searchDate));
+		}
+		while (true) {
+			String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/spend/v1/vouchers/scroll")
+					.header("Authorization", "Bearer " + accessToken)
+					.form(param)
+					.execute()
+					.body();
+//			System.out.println(resultStr);
+			JSONObject jsonObject = JSON.parseObject(resultStr);
+			if (!"0".equals(jsonObject.getString("code"))) {
+				log.info("获取凭证列表失败：{}", resultStr);
+				break;
+			}
+			JSONObject data = (JSONObject) jsonObject.get("data");
+			if (data != null) {
+				JSONArray items = (JSONArray) data.get("items");
+				for (int i = 0; i < items.size(); i++) {
+					// 构造飞书费控凭证
+					FeishuSpendVoucher feishuDept = items.getJSONObject(i).toJavaObject(FeishuSpendVoucher.class);
+					vouchers.add(feishuDept);
+				}
+
+				if ((boolean) data.get("has_more")) {
+					param.put("page_token", data.getString("page_token"));
+				} else {
+					break;
+				}
+			} else {
+				break;
+			}
+		}
+		return vouchers;
+	}
+
+	/**
+	 * 获取凭证列表
+	 *
+	 * @param searchDate
+	 * @return
+	 */
+	public static List<FeishuSpendVoucher>spendFormsWithTimestamp(Date searchDate) {
+		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		return spendFormsWithTimestamp(accessToken, searchDate);
+	}
+
+	/**
 	 * 更新飞书用户只能定义字段：公司编码、成本中心编码
 	 *
 	 * @return

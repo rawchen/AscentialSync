@@ -260,6 +260,21 @@ public class SftpUtil {
 	}
 
 	/**
+	 * 移动目录指定文件到目录下的.archive下
+	 *
+	 * @param directory
+	 * @param fileName
+	 */
+	public void moveFile(String directory, String fileName) {
+//		sftp.cd(directory);
+		try {
+			sftp.rename("/" + directory + "/" + fileName, "/" + directory + "/.archive/" + fileName);
+		} catch (SftpException e) {
+			logger.error("文件移动异常！", e);
+		}
+	}
+
+	/**
 	 * 删除文件
 	 *
 	 * @param directory      SFTP服务器的文件路径

@@ -7,10 +7,7 @@ import com.lundong.ascentialsync.entity.spend.ReimburseData;
 import com.lundong.ascentialsync.entity.spend.SpendCustomField;
 import com.lundong.ascentialsync.enums.InvoiceTypeEnum;
 import com.lundong.ascentialsync.service.SpendService;
-import com.lundong.ascentialsync.util.ExcelUtil;
-import com.lundong.ascentialsync.util.SignUtil;
-import com.lundong.ascentialsync.util.StringUtil;
-import com.lundong.ascentialsync.util.TimeUtil;
+import com.lundong.ascentialsync.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -50,19 +47,43 @@ public class SpendServiceImpl implements SpendService {
 		List<SpendCustomField> taxCodeList = SignUtil.getSpendCustomFields("0000003");
 
 		// 费控列表接口，先获取昨天添加到费控的表单列表
-		List<FeishuSpendForm> feishuSpendForms = SignUtil.spendForms(date);
-		log.info("表单数量: {}", feishuSpendForms.size());
-		// 过滤掉
-		feishuSpendForms = feishuSpendForms.stream()
-				.filter(f -> f.getBizUnitName().contains("员工差旅报销") || f.getBizUnitName().contains("员工日常报销"))
-				.collect(Collectors.toList());
-		log.info("过滤后表单数量: {}", feishuSpendForms.size());
+//		List<FeishuSpendForm> feishuSpendForms = SignUtil.spendForms(date);
+		List<FeishuSpendVoucher> feishuSpendVoucherList = SignUtil.spendFormsWithTimestamp(date);
+		log.info("昨天总单据数量（包含不同version）: {}", feishuSpendVoucherList.size());
+
+		// 过滤出不是支付完成的
+		feishuSpendVoucherList = feishuSpendVoucherList.stream()
+				.filter(f -> f.getReimburseData().size() > 0).collect(Collectors.toList());
+
+		List<ReimburseData> reimburseDataList = new ArrayList<>();
+
+		System.out.println("feishuSpendVoucherList size:" + feishuSpendVoucherList.size());
+
+		// 过滤出属于员工差旅报销和员工日常报销的
+		for (FeishuSpendVoucher feishuSpendVoucher : feishuSpendVoucherList) {
+			for (ReimburseData reimburse : feishuSpendVoucher.getReimburseData()) {
+				if ("TRAVEL_REIMBURSEMENT".equals(reimburse.getBizUnitCode()) || "EXPENSE_REIMBURSEMENT".equals(reimburse.getBizUnitCode())) {
+					reimburseDataList.add(reimburse);
+				}
+			}
+		}
+
+		System.out.println("reimburseDataList size: " + reimburseDataList.size());
+
+		// 过滤出最新的，也就是根据version过滤掉重复formCode
+		List<ReimburseData> reimburseDataListNew =  DataFilterUtil.filterByVersion(reimburseDataList);
+		System.out.println("reimburseDataListNew size: " + reimburseDataListNew.size());
+
+		// 过滤出单据状态为已完成的
+		reimburseDataListNew = reimburseDataListNew.stream().filter(r -> "completed".equals(r.getProcessStatus())).collect(Collectors.toList());
+
+		log.info("过滤后表单数量: {}", reimburseDataListNew.size());
 //		feishuSpendForms = feishuSpendForms.stream().filter(f -> f.getFormCode().equals("TR23060600004")).collect(Collectors.toList());
 //		log.info("过滤后表单数量: {}", feishuSpendForms.size());
-		for (FeishuSpendForm form : feishuSpendForms) {
+		for (ReimburseData form : reimburseDataListNew) {
 			String employeeNo = "";
 			// 通过applicant_id(申请人ID)获取员工ID
-			FeishuUser feishuUser = SignUtil.getFeishuUser(form.getApplicantId());
+			FeishuUser feishuUser = SignUtil.getFeishuUser(form.getApplicantUid());
 			if (feishuUser != null && feishuUser.getEmployeeNo() != null) {
 				employeeNo = feishuUser.getEmployeeNo();
 			}
@@ -70,6 +91,10 @@ public class SpendServiceImpl implements SpendService {
 			List<FeishuSpendVoucher> feishuSpendVouchers = SignUtil.spendVouchers(form.getFormCode());
 			// 根据单据code如果能查出来至少一条数据
 			if (feishuSpendVouchers.size() > 0) {
+
+				// 去除reimburseData列表size为0的
+				feishuSpendVouchers = feishuSpendVouchers.stream().filter(v -> v.getReimburseData().size() > 0).collect(Collectors.toList());
+
 				// 获取最新version的单据详表
 				FeishuSpendVoucher feishuSpendVoucher = feishuSpendVouchers.get(feishuSpendVouchers.size() - 1);
 				// 转换发起日期格式
@@ -77,18 +102,18 @@ public class SpendServiceImpl implements SpendService {
 				Date approvedTime = new Date();
 				// 获取最新version的reimburse_data
 				ReimburseData reimburseData = null;
-				List<ReimburseData> reimburseDataList = feishuSpendVoucher.getReimburseData();
-				if (reimburseDataList != null && reimburseDataList.size() > 0) {
-					reimburseData = reimburseDataList.get(reimburseDataList.size() - 1);
+				List<ReimburseData> reimburseDatas = feishuSpendVoucher.getReimburseData();
+				if (reimburseDatas != null && reimburseDatas.size() > 0) {
+					reimburseData = reimburseDatas.get(reimburseDatas.size() - 1);
 				}
 				try {
-					submitTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(form.getSubmitTime());
+					submitTime = TimeUtil.timestampToDate(form.getApplicantTime());
 					if (reimburseData != null) {
 						String approvedTimeString = reimburseData.getApprovedTime();
 						if (approvedTimeString != null) {
 							if (!approvedTimeString.contains(":") && approvedTimeString.length() == 13) {
 								// 时间为时间戳
-								approvedTimeString = TimeUtil.timestampToDate(approvedTimeString);
+								approvedTimeString = TimeUtil.timestampToDateFormat(approvedTimeString);
 							}
 							approvedTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(approvedTimeString);
 						}
@@ -207,7 +232,8 @@ public class SpendServiceImpl implements SpendService {
 
 						// TODO recordNew.taxCode
 						// 税码
-						if (form.getBizUnitName().contains("员工日常报销")) {
+						// 员工日常报销
+						if (form.getBizUnitCode().contains("EXPENSE_REIMBURSEMENT")) {
 							recordNew.setTaxCode("J0");
 							// 修改税金为0和修改不含税金额为总金额
 							recordNew.setTaxAmount("0");

@@ -24,6 +24,10 @@ public class ReimburseData {
 	@JSONField(name = "amount")
 	private Double amount;
 
+
+	@JSONField(name = "applicant_time")
+	private String applicantTime;
+
 	@JSONField(name = "applicant_uid")
 	private String applicantUid;
 
@@ -89,6 +93,9 @@ public class ReimburseData {
 
 	@JSONField(name = "cost_center_name")
 	private String costCenterName;
+
+	@JSONField(name = "version")
+	private String version;
 
 
 }

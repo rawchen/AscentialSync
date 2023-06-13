@@ -36,7 +36,8 @@ public class SyncServiceImpl implements SyncService {
 	public void syncStaffData() {
 		SftpUtil sftpUtil = new SftpUtil(Constants.SFTP_USER_ID, Constants.SFTP_PASSWORD, Constants.SFTP_HOST, 22);
 		sftpUtil.login();
-		InputStream inputStream = sftpUtil.downloadStream("workday2feishu", "staff-" + LocalDateTimeUtil.format(LocalDate.now(), "yyyyMMdd") + ".csv");
+		String fileName = "WorkdayFeishu_" + LocalDateTimeUtil.format(LocalDate.now().minusDays(3), "ddMMyyyy") + ".csv";
+		InputStream inputStream = sftpUtil.downloadStream("workday2feishu", fileName);
 		if (inputStream == null) {
 			log.info("无该日期员工同步数据：{}", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
 			return;
@@ -93,8 +94,15 @@ public class SyncServiceImpl implements SyncService {
 			}
 		}
 		// 飞书用户设置字段后做修改，如果该用户不存在就抛出错误
+		List<Boolean> resultList = new ArrayList<>();
 		for (FeishuUser feishuUser : collect) {
-			SignUtil.updateFeishuUser(feishuUser, companyCodeAttrId, costCenterCodeAttrId);
+			boolean r = SignUtil.updateFeishuUser(feishuUser, companyCodeAttrId, costCenterCodeAttrId);
+			resultList.add(r);
+		}
+		List<Boolean> resultFilterList = resultList.stream().filter(r -> r).collect(Collectors.toList());
+		if (resultFilterList.size() > 0) {
+			// 至少成功修改一个用户的数据
+			sftpUtil.moveFile("workday2feishu", fileName);
 		}
 	}
 }

@@ -1,7 +1,9 @@
 package com.lundong.ascentialsync;
 
+import com.lundong.ascentialsync.config.Constants;
 import com.lundong.ascentialsync.entity.*;
 import com.lundong.ascentialsync.util.ExcelUtil;
+import com.lundong.ascentialsync.util.SftpUtil;
 import com.lundong.ascentialsync.util.SignUtil;
 import com.lundong.ascentialsync.util.TimeUtil;
 import org.junit.jupiter.api.Test;
@@ -10,7 +12,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 @SpringBootTest
@@ -80,9 +84,22 @@ class AscentialSyncApplicationTests {
 	}
 
 	@Test
-	void testTimestampToDate() {
-		String s = TimeUtil.timestampToDate("1685588983070");
+	void testTimestampToDateFormat() {
+		String s = TimeUtil.timestampToDateFormat("1685588983070");
 		System.out.println(s);
+	}
+
+	@Test
+	void testTimestampToDate() {
+		Date date = TimeUtil.timestampToDate("1685516215000");
+		System.out.println(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(date));
+	}
+
+	@Test
+	void moveFile() {
+		SftpUtil sftpUtil = new SftpUtil(Constants.SFTP_USER_ID, Constants.SFTP_PASSWORD, Constants.SFTP_HOST, 22);
+		sftpUtil.login();
+		sftpUtil.moveFile("workday2feishu", "WorkdayFeishu_06062023.csv");
 	}
 
 }
