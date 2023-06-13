@@ -1,7 +1,8 @@
 package com.lundong.ascentialsync.controller;
 
+import com.lundong.ascentialsync.service.PaypoolService;
 import com.lundong.ascentialsync.service.SpendService;
-import com.lundong.ascentialsync.service.SyncService;
+import com.lundong.ascentialsync.service.StaffService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,20 +19,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class SyncController {
 
 	@Autowired
-	SyncService syncService;
+	StaffService syncService;
 
 	@Autowired
 	SpendService spendService;
 
-	@GetMapping("/syncStaff")
-	public void syncStaff() {
+	@Autowired
+	PaypoolService paypoolService;
+
+	@GetMapping("/syncStaffData")
+	public void syncStaffData() {
 		syncService.syncStaffData();
 	}
 
-	@GetMapping("/syncFormData")
+	@GetMapping("/syncSpendData")
 	public void syncFormData() {
-		spendService.syncFormData();
+		spendService.syncSpendData();
 	}
 
+	@GetMapping("/syncPaypoolData")
+	public void syncPaypoolData() {
+		paypoolService.syncPaypoolData();
+	}
 
 }

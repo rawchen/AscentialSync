@@ -9,7 +9,7 @@ import com.lundong.ascentialsync.config.Constants;
 import com.lundong.ascentialsync.entity.CustomAttr;
 import com.lundong.ascentialsync.entity.ExcelUser;
 import com.lundong.ascentialsync.entity.FeishuUser;
-import com.lundong.ascentialsync.service.SyncService;
+import com.lundong.ascentialsync.service.StaffService;
 import com.lundong.ascentialsync.util.SftpUtil;
 import com.lundong.ascentialsync.util.SignUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -25,18 +25,20 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
+ * 同步员工数据
+ *
  * @author RawChen
  * @date 2023-05-12 14:24
  */
 @Service
 @Slf4j
-public class SyncServiceImpl implements SyncService {
+public class StaffServiceImpl implements StaffService {
 	@Override
 	@Scheduled(cron = "0 0 1 ? * *")
 	public void syncStaffData() {
 		SftpUtil sftpUtil = new SftpUtil(Constants.SFTP_USER_ID, Constants.SFTP_PASSWORD, Constants.SFTP_HOST, 22);
 		sftpUtil.login();
-		String fileName = "WorkdayFeishu_" + LocalDateTimeUtil.format(LocalDate.now().minusDays(3), "ddMMyyyy") + ".csv";
+		String fileName = "WorkdayFeishu_" + LocalDateTimeUtil.format(LocalDate.now().minusDays(1), "ddMMyyyy") + ".csv";
 		InputStream inputStream = sftpUtil.downloadStream("workday2feishu", fileName);
 		if (inputStream == null) {
 			log.info("无该日期员工同步数据：{}", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));

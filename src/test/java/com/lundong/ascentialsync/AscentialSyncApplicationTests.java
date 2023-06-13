@@ -102,4 +102,18 @@ class AscentialSyncApplicationTests {
 		sftpUtil.moveFile("workday2feishu", "WorkdayFeishu_06062023.csv");
 	}
 
+	@Test
+	void getPaypools() {
+		List<FeishuPaypool> paypools = SignUtil.getPaypools(null);
+		System.out.println("size: " + paypools.size());
+		for (FeishuPaypool paypool : paypools) {
+			System.out.println(paypool);
+		}
+	}
+
+	@Test
+	void testUpdatePaypool() {
+		SignUtil.updatePaypool("7231075633424744765", "26c7gf5g");
+	}
+
 }

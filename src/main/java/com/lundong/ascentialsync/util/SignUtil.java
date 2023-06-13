@@ -27,6 +27,7 @@ public class SignUtil {
 
 	/**
 	 * SAP系统自定义签名规则
+	 *
 	 * @param objects
 	 * @param secretKey
 	 * @param requestJson
@@ -340,7 +341,7 @@ public class SignUtil {
 	 * @param accessToken
 	 * @return
 	 */
-	public static List<FeishuSpendVoucher>spendVouchers(String accessToken, String formCode) {
+	public static List<FeishuSpendVoucher> spendVouchers(String accessToken, String formCode) {
 		List<FeishuSpendVoucher> vouchers = new ArrayList<>();
 		Map<String, Object> param = new HashMap<>();
 		while (true) {
@@ -384,7 +385,7 @@ public class SignUtil {
 	 *
 	 * @return
 	 */
-	public static List<FeishuSpendVoucher>spendVouchers(String formCode) {
+	public static List<FeishuSpendVoucher> spendVouchers(String formCode) {
 		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
 		return spendVouchers(accessToken, formCode);
 	}
@@ -396,7 +397,7 @@ public class SignUtil {
 	 * @param searchDate
 	 * @return
 	 */
-	public static List<FeishuSpendForm>spendForms(String accessToken, Date searchDate) {
+	public static List<FeishuSpendForm> spendForms(String accessToken, Date searchDate) {
 		List<FeishuSpendForm> forms = new ArrayList<>();
 		Map<String, Object> param = new HashMap<>();
 		param.put("page_size", 20);
@@ -447,7 +448,7 @@ public class SignUtil {
 	 * @param searchDate
 	 * @return
 	 */
-	public static List<FeishuSpendForm>spendForms(Date searchDate) {
+	public static List<FeishuSpendForm> spendForms(Date searchDate) {
 		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
 		return spendForms(accessToken, searchDate);
 	}
@@ -459,7 +460,7 @@ public class SignUtil {
 	 * @param searchDate
 	 * @return
 	 */
-	public static List<FeishuSpendVoucher>spendFormsWithTimestamp(String accessToken, Date searchDate) {
+	public static List<FeishuSpendVoucher> spendFormsWithTimestamp(String accessToken, Date searchDate) {
 		List<FeishuSpendVoucher> vouchers = new ArrayList<>();
 		Map<String, Object> param = new HashMap<>();
 		param.put("page_size", 20);
@@ -518,7 +519,7 @@ public class SignUtil {
 	 * @param searchDate
 	 * @return
 	 */
-	public static List<FeishuSpendVoucher>spendFormsWithTimestamp(Date searchDate) {
+	public static List<FeishuSpendVoucher> spendFormsWithTimestamp(Date searchDate) {
 		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
 		return spendFormsWithTimestamp(accessToken, searchDate);
 	}
@@ -852,5 +853,106 @@ public class SignUtil {
 	public static List<SpendCustomField> getSpendCustomFields(String fieldCode) {
 		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
 		return getSpendCustomFields(accessToken, fieldCode);
+	}
+
+	/**
+	 * 遍历支付池
+	 *
+	 * @param accessToken
+	 * @return
+	 */
+	public static List<FeishuPaypool> getPaypools(String accessToken, String formCode) {
+		List<FeishuPaypool> feishuPaypoolList = new ArrayList<>();
+		Map<String, Object> param = new HashMap<>();
+		JSONObject bodyObject = new JSONObject();
+		bodyObject.put("page_size", "100");
+		if (formCode != null) {
+			bodyObject.put("vendor_form_header_code_from", formCode);
+			bodyObject.put("vendor_form_header_code_to", formCode);
+		}
+		while (true) {
+			String resultStr = HttpRequest.post("https://open.feishu.cn/open-apis/spend/v1/paypools2/scroll?page_token="
+							+ (param.get("page_token") == null ? "" : param.get("page_token")))
+					.header("Authorization", "Bearer " + accessToken)
+//					.form(param)
+					.body(bodyObject.toJSONString())
+					.execute()
+					.body();
+			JSONObject jsonObject = JSON.parseObject(resultStr);
+			if (jsonObject != null && "0".equals(jsonObject.getString("code"))) {
+				JSONObject data = (JSONObject) jsonObject.get("data");
+				JSONArray items = (JSONArray) data.get("items");
+				for (int i = 0; i < items.size(); i++) {
+					FeishuPaypool paypool = items.getJSONObject(i).toJavaObject(FeishuPaypool.class);
+					feishuPaypoolList.add(paypool);
+				}
+
+				if (data.getBoolean("has_more")) {
+					param.put("page_token", data.getString("page_token"));
+				} else {
+					break;
+				}
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		return feishuPaypoolList;
+	}
+
+	/**
+	 * 飞书（标准版）获取花名册信息
+	 *
+	 * @return
+	 */
+	public static List<FeishuPaypool> getPaypools(String formCode) {
+		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		return getPaypools(accessToken, formCode);
+	}
+
+	/**
+	 * 更新支付池支付状态
+	 *
+	 * @param accessToken
+	 * @param id
+	 * @param accountant
+	 * @return
+	 */
+	public static boolean updatePaypool(String accessToken, String id, String accountant) {
+		JSONObject bodyObject = new JSONObject();
+		bodyObject.put("payment_status_code", "A5");
+		bodyObject.put("modifier", accountant);
+		String resultStr = HttpRequest.patch("https://open.feishu.cn/open-apis/spend/v1/paypools2/" + id)
+				.header("Authorization", "Bearer " + accessToken)
+				.body(bodyObject.toJSONString())
+				.execute()
+				.body();
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		System.out.println(resultStr);
+		JSONObject jsonObject = JSON.parseObject(resultStr);
+		if (jsonObject != null && jsonObject.getInteger("code") == 0) {
+			return true;
+		} else {
+			log.info("更新支付池支付状态失败: {}", resultStr);
+			return false;
+		}
+	}
+
+	/**
+	 * 更新支付池支付状态
+	 *
+	 * @param id
+	 * @param accountant
+	 * @return
+	 */
+	public static boolean updatePaypool(String id, String accountant) {
+		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		return updatePaypool(accessToken, id, accountant);
 	}
 }
