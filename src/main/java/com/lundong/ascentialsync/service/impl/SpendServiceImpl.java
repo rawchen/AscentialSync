@@ -1,6 +1,10 @@
 package com.lundong.ascentialsync.service.impl;
 
-import com.lundong.ascentialsync.entity.*;
+import com.lundong.ascentialsync.config.Constants;
+import com.lundong.ascentialsync.entity.ExcelHeader;
+import com.lundong.ascentialsync.entity.ExcelRecord;
+import com.lundong.ascentialsync.entity.FeishuSpendVoucher;
+import com.lundong.ascentialsync.entity.FeishuUser;
 import com.lundong.ascentialsync.entity.spend.Allocation;
 import com.lundong.ascentialsync.entity.spend.InvoiceDetail;
 import com.lundong.ascentialsync.entity.spend.ReimburseData;
@@ -14,7 +18,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.ParseException;
@@ -520,32 +523,30 @@ public class SpendServiceImpl implements SpendService {
 								}
 							}
 						}
-
 						excelRecords.add(record);
 						excelRecords.add(recordNew);
 					}
-
 				}
 
 				// 生成上传CSV到SFTP
 				try {
 					String fileName = employeeNo + "_" + new SimpleDateFormat("ddMMyyyyHHmmss").format(new Date()) +".csv";
-//					SftpUtil sftpUtil = new SftpUtil(Constants.SFTP_USER_ID, Constants.SFTP_PASSWORD, Constants.SFTP_HOST, 22);
-//					sftpUtil.login();
+					SftpUtil sftpUtil = new SftpUtil(Constants.SFTP_USER_ID, Constants.SFTP_PASSWORD, Constants.SFTP_HOST, 22);
+					sftpUtil.login();
 					ByteArrayOutputStream baos = new ByteArrayOutputStream();
 //					baos.write(0xef);
 //					baos.write(0xbb);
 //					baos.write(0xbf);
 					ExcelUtil.generateCsv(header, excelRecords, baos);
-					FileOutputStream fos = new FileOutputStream("C:\\" + fileName);
+//					FileOutputStream fos = new FileOutputStream("C:\\" + fileName);
 					//追加BOM标识
 //					fos.write(0xef);
 //					fos.write(0xbb);
 //					fos.write(0xbf);
-					fos.write(baos.toByteArray());
-					fos.close();
+//					fos.write(baos.toByteArray());
+//					fos.close();
 
-//					sftpUtil.upload("expfeishu2sap", fileName, baos.toByteArray());
+					sftpUtil.upload("expfeishu2sap", fileName, baos.toByteArray());
 					log.info("生成CSV文件：{}", fileName);
 					baos.close();
 				} catch (Exception e) {

@@ -402,20 +402,20 @@ public class SignUtil {
 		Map<String, Object> param = new HashMap<>();
 		param.put("page_size", 20);
 		if (searchDate != null) {
-			Date date = new Date();
-			Calendar calendar = new GregorianCalendar();
-			calendar.setTime(date);
-			calendar.add(Calendar.DATE, -10);
-			date = calendar.getTime();
+//			Date date = new Date();
+//			Calendar calendar = new GregorianCalendar();
+//			calendar.setTime(date);
+//			calendar.add(Calendar.DATE, -10);
+//			date = calendar.getTime();
+//
+//			Date endDate = new Date();
+//			Calendar endCalendar = new GregorianCalendar();
+//			endCalendar.setTime(endDate);
+//			endCalendar.add(Calendar.DATE, -1);
+//			endDate = endCalendar.getTime();
 
-			Date endDate = new Date();
-			Calendar endCalendar = new GregorianCalendar();
-			endCalendar.setTime(endDate);
-			endCalendar.add(Calendar.DATE, -1);
-			endDate = endCalendar.getTime();
-
-			param.put("submit_start_time", new SimpleDateFormat("yyyy-MM-dd").format(date));
-			param.put("submit_end_time", new SimpleDateFormat("yyyy-MM-dd").format(endDate));
+			param.put("submit_start_time", new SimpleDateFormat("yyyy-MM-dd").format(searchDate));
+			param.put("submit_end_time", new SimpleDateFormat("yyyy-MM-dd").format(searchDate));
 		}
 		while (true) {
 			String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/spend/v1/forms")
