@@ -55,7 +55,7 @@ public class StaffServiceImpl implements StaffService {
 				@Override
 				public void doAfterAllAnalysed(AnalysisContext context) {
 				}
-			}).excelType(ExcelTypeEnum.CSV).sheet().headRowNumber(2).doRead();
+			}).excelType(ExcelTypeEnum.CSV).sheet().headRowNumber(1).doRead();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -102,6 +102,7 @@ public class StaffServiceImpl implements StaffService {
 			resultList.add(r);
 		}
 		List<Boolean> resultFilterList = resultList.stream().filter(r -> r).collect(Collectors.toList());
+		log.info("修改成功的员工数: {}", resultFilterList.size());
 		if (resultFilterList.size() > 0) {
 			// 至少成功修改一个用户的数据
 			sftpUtil.moveFile("workday2feishu", fileName);
