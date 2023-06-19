@@ -79,6 +79,10 @@ public class SpendServiceImpl implements SpendService {
 		List<ReimburseData> reimburseDataListNew =  DataFilterUtil.filterByVersion(reimburseDataList);
 		System.out.println("reimburseDataListNew size: " + reimburseDataListNew.size());
 
+//		for (ReimburseData reimburseData : reimburseDataListNew) {
+//			System.out.println(reimburseData);
+//		}
+
 		// 过滤出单据状态为已完成的
 		reimburseDataListNew = reimburseDataListNew.stream().filter(r -> "completed".equals(r.getProcessStatus())).collect(Collectors.toList());
 

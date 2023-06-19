@@ -33,7 +33,7 @@ public class SyncController {
 	}
 
 	@GetMapping("/syncSpendData")
-	public void syncFormData() {
+	public void syncSpendData() {
 		spendService.syncSpendData();
 	}
 

@@ -12,6 +12,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.stereotype.Component;
 
 import java.net.HttpCookie;
 import java.text.SimpleDateFormat;
@@ -23,7 +26,11 @@ import java.util.stream.Collectors;
  * @date 2023-03-08 18:37
  */
 @Slf4j
+@Component
 public class SignUtil {
+
+	@Autowired
+	private static ApplicationArguments applicationArguments;
 
 	/**
 	 * SAP系统自定义签名规则
@@ -562,6 +569,15 @@ public class SignUtil {
 		if ("0".equals(jsonObject.getString("code"))) {
 			return true;
 		} else {
+			String chatIdArg = "";
+			String userIdArg = "";
+			if (applicationArguments.getOptionValues("chatIdArg").size() > 0) {
+				chatIdArg = applicationArguments.getOptionValues("chatIdArg").get(0);
+			}
+			if (applicationArguments.getOptionValues("userIdArg").size() > 0) {
+				userIdArg = applicationArguments.getOptionValues("userIdArg").get(0);
+			}
+			SignUtil.sendMsg(chatIdArg, userIdArg, "更新CompanyCode/CostCenter失败：" + resultStr);
 			return false;
 		}
 	}
@@ -934,12 +950,23 @@ public class SignUtil {
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		System.out.println(resultStr);
+//		System.out.println(resultStr);
 		JSONObject jsonObject = JSON.parseObject(resultStr);
 		if (jsonObject != null && jsonObject.getInteger("code") == 0) {
 			return true;
 		} else {
 			log.info("更新支付池支付状态失败: {}", resultStr);
+			String chatIdArg = "";
+			String userIdArg = "";
+			List<String> chatIdArgList = applicationArguments.getOptionValues("chatId");
+			if (chatIdArgList != null && chatIdArgList.size() > 0) {
+				chatIdArg = chatIdArgList.get(0);
+			}
+			List<String> userIdArgList = applicationArguments.getOptionValues("userId");
+			if (userIdArgList != null && userIdArgList.size() > 0) {
+				userIdArg = userIdArgList.get(0);
+			}
+			SignUtil.sendMsg(chatIdArg, userIdArg, "更新支付池支付状态失败：" + resultStr);
 			return false;
 		}
 	}
@@ -954,5 +981,64 @@ public class SignUtil {
 	public static boolean updatePaypool(String id, String accountant) {
 		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
 		return updatePaypool(accessToken, id, accountant);
+	}
+
+	/**
+	 * 发送消息
+	 *
+	 * @param accessToken
+	 * @param chatId
+	 * @param userId
+	 * @param content
+	 * @return
+	 */
+	public static void sendMsg(String accessToken, String chatId, String userId, String content) {
+		if (chatId != null && !"".equals(chatId)) {
+			// 发送群消息
+			JSONObject bodyObject = new JSONObject();
+			bodyObject.put("receive_id", chatId);
+			bodyObject.put("msg_type", "text");
+			bodyObject.put("content", "{\"text\":\"" + content + "\"}");
+			String resultStr = HttpRequest.post("https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id")
+					.header("Authorization", "Bearer " + accessToken)
+					.body(bodyObject.toJSONString())
+					.execute()
+					.body();
+			JSONObject jsonObject = JSON.parseObject(resultStr);
+			if (jsonObject != null && jsonObject.getInteger("code") == 0) {
+			} else {
+				log.info("调用接口失败: {}", resultStr);
+			}
+		}
+
+		if (userId != null && !"".equals(userId)) {
+			// 发送群消息
+			JSONObject bodyObject = new JSONObject();
+			bodyObject.put("receive_id", userId);
+			bodyObject.put("msg_type", "text");
+			bodyObject.put("content", "{\"text\":\"" + content + "\"}");
+			String resultStr = HttpRequest.post("https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=user_id")
+					.header("Authorization", "Bearer " + accessToken)
+					.body(bodyObject.toJSONString())
+					.execute()
+					.body();
+			JSONObject jsonObject = JSON.parseObject(resultStr);
+			if (jsonObject != null && jsonObject.getInteger("code") == 0) {
+			} else {
+				log.info("调用接口失败: {}", resultStr);
+			}
+		}
+	}
+
+	/**
+	 * 发送消息
+	 *
+	 * @param chatId
+	 * @param userId
+	 * @param content
+	 */
+	public static void sendMsg(String chatId, String userId, String content) {
+		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		sendMsg(accessToken, chatId, userId, content);
 	}
 }
