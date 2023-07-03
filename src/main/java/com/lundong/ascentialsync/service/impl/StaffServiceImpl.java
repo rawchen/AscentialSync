@@ -13,6 +13,7 @@ import com.lundong.ascentialsync.service.StaffService;
 import com.lundong.ascentialsync.util.SftpUtil;
 import com.lundong.ascentialsync.util.SignUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -33,10 +34,14 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class StaffServiceImpl implements StaffService {
+
+	@Autowired
+	private Constants constants;
+
 	@Override
 	@Scheduled(cron = "0 0 1 ? * *")
 	public void syncStaffData() {
-		SftpUtil sftpUtil = new SftpUtil(Constants.SFTP_USER_ID, Constants.SFTP_PASSWORD, Constants.SFTP_HOST, 22);
+		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
 		sftpUtil.login();
 		String fileName = "WorkdayFeishu_" + LocalDateTimeUtil.format(LocalDate.now().minusDays(1), "ddMMyyyy") + ".csv";
 		InputStream inputStream = sftpUtil.downloadStream("workday2feishu", fileName);

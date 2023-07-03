@@ -1,6 +1,20 @@
 server:
-  port: 8080
-
+  port: 8060
 spring:
   application:
     name: AscentialSync
+custom:
+  # 飞书应用App ID
+  app-id-feishu: cli_a4dec2fxxxxxxxx
+  # 飞书应用App Secret
+  app-secret-feishu: kNm1sLuPc6hS2yNDXNxxxxxxxxxxxxxxxx
+  # SFTP主机
+  sftp-host: xxx
+  # SFTP用户
+  sftp-user-id: xxx
+  # SFTP密码
+  sftp-password: xxx
+  # 警告接收群ID （获取chat_id：https://open.feishu.cn/document/server-docs/group/chat/chat-id-description）
+  chat-id-arg:
+  # 警告接收人ID （获取user_id：https://open.feishu.cn/document/server-docs/contact-v3/user/batch_get_id）
+  user-id-arg:

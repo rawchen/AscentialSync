@@ -12,6 +12,7 @@ import com.lundong.ascentialsync.service.PaypoolService;
 import com.lundong.ascentialsync.util.SftpUtil;
 import com.lundong.ascentialsync.util.SignUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -30,13 +31,17 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class PaypoolServiceImpl implements PaypoolService {
+
+	@Autowired
+	private Constants constants;
+
 	/**
 	 * 同步昨天一天支付池数据
 	 */
 	@Override
-	@Scheduled(cron = "0 0 1 ? * *")
+	@Scheduled(cron = "0 0 3 ? * *")
 	public void syncPaypoolData() {
-		SftpUtil sftpUtil = new SftpUtil(Constants.SFTP_USER_ID, Constants.SFTP_PASSWORD, Constants.SFTP_HOST, 22);
+		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
 		sftpUtil.login();
 		String fileName = "PaymentRunReport_" + LocalDateTimeUtil.format(LocalDate.now().minusDays(1), "ddMMyyyy") + ".csv";
 		InputStream inputStream = sftpUtil.downloadStream("pmtrepsap2feishu", fileName);

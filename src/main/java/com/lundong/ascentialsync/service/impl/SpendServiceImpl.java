@@ -14,6 +14,7 @@ import com.lundong.ascentialsync.service.SpendService;
 import com.lundong.ascentialsync.util.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -34,11 +35,15 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class SpendServiceImpl implements SpendService {
+
+	@Autowired
+	private Constants constants;
+
 	/**
 	 * 每天定时同步昨天新增的差旅报销单和日常费用报销单，生成固定的csv文件到sftp的expfeishu2sap文件夹
 	 */
 	@Override
-	@Scheduled(cron = "0 0 1 ? * *")
+	@Scheduled(cron = "0 0 2 ? * *")
 	public void syncSpendData() {
 
 		Date date = new Date();
@@ -164,7 +169,7 @@ public class SpendServiceImpl implements SpendService {
 								.amountInTransactionCurrency(invoiceDetail.getGrossAmount())	// 区分含税和不含税
 								.documentItemText("")
 								.debitCreditCode("")	// 借记代码
-								.wbsElement(StringUtil.nullIsEmpty(invoiceDetail.getProjectCode()))
+								.wbsElement(StringUtil.nullIsEmpty(reimburseData.getProjectCode()))
 								.assignmentReference("")
 								.taxCode("") // 税码
 								.deliveryCentre("")
@@ -280,7 +285,7 @@ public class SpendServiceImpl implements SpendService {
 												if (invoiceTaxRate != null) {
 													invoiceTaxRate = StringUtil.taxRateFormat(invoiceTaxRate);
 													for (SpendCustomField taxCode : taxCodeList) {
-														if (taxCode.getNameI18n().toLowerCase().startsWith(invoiceTaxRate + " input vat")) {
+														if (taxCode.getNameI18n().toLowerCase().startsWith(invoiceTaxRate + " transportation input vat")) {
 															recordNew.setTaxCode(taxCode.getCode());
 															break OUT;
 														}
@@ -313,7 +318,7 @@ public class SpendServiceImpl implements SpendService {
 									case HIGHWAY_TOLL_INVOICE:
 										// 客运发票
 										for (SpendCustomField taxCode : taxCodeList) {
-											if (taxCode.getNameI18n().toLowerCase().startsWith("3% input vat")) {
+											if (taxCode.getNameI18n().toLowerCase().startsWith("3% transportation input vat")) {
 												recordNew.setTaxCode(taxCode.getCode());
 												// 重新计算税额
 												// 不含税金额 = 全额 / (1+税率)
@@ -331,7 +336,7 @@ public class SpendServiceImpl implements SpendService {
 									case TRAIN_TICKET:
 										// 航空机票行程单/火车票
 										for (SpendCustomField taxCode : taxCodeList) {
-											if (taxCode.getNameI18n().toLowerCase().startsWith("9% input vat")) {
+											if (taxCode.getNameI18n().toLowerCase().startsWith("9% transportation input vat")) {
 												recordNew.setTaxCode(taxCode.getCode());
 												// 重新计算税额
 												// 不含税金额 = 全额 / (1+税率)
@@ -535,7 +540,7 @@ public class SpendServiceImpl implements SpendService {
 				// 生成上传CSV到SFTP
 				try {
 					String fileName = employeeNo + "_" + new SimpleDateFormat("ddMMyyyyHHmmss").format(new Date()) +".csv";
-					SftpUtil sftpUtil = new SftpUtil(Constants.SFTP_USER_ID, Constants.SFTP_PASSWORD, Constants.SFTP_HOST, 22);
+					SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
 					sftpUtil.login();
 					ByteArrayOutputStream baos = new ByteArrayOutputStream();
 //					baos.write(0xef);

@@ -72,7 +72,4 @@ public class InvoiceDetail {
 	@JSONField(name = "under_reimbursement")
 	private Boolean underReimbursement;
 
-	@JSONField(name = "project_code")
-	private String projectCode;
-
 }

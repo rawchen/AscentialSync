@@ -1676,7 +1676,7 @@ public class CustomEventDispatcher implements IHandler {
 
 
         /**
-         * <p> 单据更新事件
+         * <p> 单据更新事件（出差申请单）
          * <p> https://open.feishu.cn/document/server-docs/spend-v1/form/events/updated
          *
          * @param handler

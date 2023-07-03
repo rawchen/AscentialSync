@@ -13,9 +13,10 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.ApplicationArguments;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import java.net.HttpCookie;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -30,7 +31,15 @@ import java.util.stream.Collectors;
 public class SignUtil {
 
 	@Autowired
-	private static ApplicationArguments applicationArguments;
+	private static Constants constants;
+
+	@Autowired
+	ApplicationContext applicationContext;
+
+	@PostConstruct
+	public void init() {
+		constants = applicationContext.getBean(Constants.class);
+	}
 
 	/**
 	 * SAP系统自定义签名规则
@@ -122,7 +131,7 @@ public class SignUtil {
 		if (StringUtil.isEmpty(openDepartmentId) || "0".equals(openDepartmentId)) {
 			return "0";
 		} else {
-			String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+			String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 			return getDepartmentIdAndName(accessToken, openDepartmentId);
 		}
 	}
@@ -134,7 +143,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static List<String> batchInsertRecord(String json, String appToken, String tableId, String name) {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return batchInsertRecord(accessToken, json, appToken, tableId, name);
 	}
 
@@ -183,7 +192,7 @@ public class SignUtil {
 	 * @param tableId
 	 */
 	public static void batchClearTable(List<String> recordIds, String appToken, String tableId) {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		batchClearTable(accessToken, recordIds, appToken, tableId);
 	}
 
@@ -229,7 +238,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static List<FeishuUser> findByDepartment() {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return findByDepartment(accessToken);
 	}
 
@@ -281,7 +290,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static List<FeishuDept> departments() {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return departments(accessToken);
 	}
 
@@ -393,7 +402,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static List<FeishuSpendVoucher> spendVouchers(String formCode) {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return spendVouchers(accessToken, formCode);
 	}
 
@@ -456,7 +465,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static List<FeishuSpendForm> spendForms(Date searchDate) {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return spendForms(accessToken, searchDate);
 	}
 
@@ -527,7 +536,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static List<FeishuSpendVoucher> spendFormsWithTimestamp(Date searchDate) {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return spendFormsWithTimestamp(accessToken, searchDate);
 	}
 
@@ -537,7 +546,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static boolean updateFeishuUser(FeishuUser user, String companyCodeAttrId, String costCenterCodeAttrId) {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return updateFeishuUser(accessToken, user, companyCodeAttrId, costCenterCodeAttrId);
 	}
 
@@ -569,15 +578,7 @@ public class SignUtil {
 		if ("0".equals(jsonObject.getString("code"))) {
 			return true;
 		} else {
-			String chatIdArg = "";
-			String userIdArg = "";
-			if (applicationArguments.getOptionValues("chatIdArg").size() > 0) {
-				chatIdArg = applicationArguments.getOptionValues("chatIdArg").get(0);
-			}
-			if (applicationArguments.getOptionValues("userIdArg").size() > 0) {
-				userIdArg = applicationArguments.getOptionValues("userIdArg").get(0);
-			}
-			SignUtil.sendMsg(chatIdArg, userIdArg, "更新CompanyCode/CostCenter失败：" + resultStr);
+			SignUtil.sendMsg(constants.CHAT_ID_ARG, constants.USER_ID_ARG, "更新CompanyCode/CostCenter失败：" + resultStr);
 			return false;
 		}
 	}
@@ -588,7 +589,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static List<CustomAttr> getCustomAttrs() {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return getCustomAttrs(accessToken);
 	}
 
@@ -698,7 +699,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static FeishuUser getFeishuUser(String userId) {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return getFeishuUser(accessToken, userId);
 	}
 
@@ -770,7 +771,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static List<FeishuUser> getFeishuEmployees() {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return getFeishuEmployees(accessToken);
 	}
 
@@ -823,7 +824,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static List<FeishuUser> getFeishuBaseEmployees() {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return getFeishuBaseEmployees(accessToken);
 	}
 
@@ -867,7 +868,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static List<SpendCustomField> getSpendCustomFields(String fieldCode) {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return getSpendCustomFields(accessToken, fieldCode);
 	}
 
@@ -919,12 +920,12 @@ public class SignUtil {
 	}
 
 	/**
-	 * 飞书（标准版）获取花名册信息
+	 * 遍历支付池
 	 *
 	 * @return
 	 */
 	public static List<FeishuPaypool> getPaypools(String formCode) {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return getPaypools(accessToken, formCode);
 	}
 
@@ -956,17 +957,7 @@ public class SignUtil {
 			return true;
 		} else {
 			log.info("更新支付池支付状态失败: {}", resultStr);
-			String chatIdArg = "";
-			String userIdArg = "";
-			List<String> chatIdArgList = applicationArguments.getOptionValues("chatId");
-			if (chatIdArgList != null && chatIdArgList.size() > 0) {
-				chatIdArg = chatIdArgList.get(0);
-			}
-			List<String> userIdArgList = applicationArguments.getOptionValues("userId");
-			if (userIdArgList != null && userIdArgList.size() > 0) {
-				userIdArg = userIdArgList.get(0);
-			}
-			SignUtil.sendMsg(chatIdArg, userIdArg, "更新支付池支付状态失败：" + resultStr);
+			SignUtil.sendMsg(constants.CHAT_ID_ARG, constants.USER_ID_ARG, "更新支付池支付状态失败：" + resultStr);
 			return false;
 		}
 	}
@@ -979,7 +970,7 @@ public class SignUtil {
 	 * @return
 	 */
 	public static boolean updatePaypool(String id, String accountant) {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		return updatePaypool(accessToken, id, accountant);
 	}
 
@@ -1038,7 +1029,7 @@ public class SignUtil {
 	 * @param content
 	 */
 	public static void sendMsg(String chatId, String userId, String content) {
-		String accessToken = getAccessToken(Constants.APP_ID_FEISHU, Constants.APP_SECRET_FEISHU);
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
 		sendMsg(accessToken, chatId, userId, content);
 	}
 }

@@ -7,6 +7,7 @@ import com.lundong.ascentialsync.util.SftpUtil;
 import com.lundong.ascentialsync.util.SignUtil;
 import com.lundong.ascentialsync.util.TimeUtil;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.io.IOException;
@@ -19,6 +20,9 @@ import java.util.List;
 
 @SpringBootTest
 class AscentialSyncApplicationTests {
+
+	@Autowired
+	private Constants constants;
 
 	@Test
 	void testGetCustomAttrs() {
@@ -97,7 +101,7 @@ class AscentialSyncApplicationTests {
 
 	@Test
 	void moveFile() {
-		SftpUtil sftpUtil = new SftpUtil(Constants.SFTP_USER_ID, Constants.SFTP_PASSWORD, Constants.SFTP_HOST, 22);
+		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
 		sftpUtil.login();
 		sftpUtil.moveFile("workday2feishu", "WorkdayFeishu_06062023.csv");
 	}
@@ -116,4 +120,8 @@ class AscentialSyncApplicationTests {
 		SignUtil.updatePaypool("7231075633424744765", "26c7gf5g");
 	}
 
+	@Test
+	void getAppId() {
+		System.out.println();
+	}
 }
