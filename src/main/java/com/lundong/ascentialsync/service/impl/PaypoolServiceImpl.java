@@ -46,7 +46,7 @@ public class PaypoolServiceImpl implements PaypoolService {
 		String fileName = "PaymentRunReport_" + LocalDateTimeUtil.format(LocalDate.now().minusDays(1), "ddMMyyyy") + ".csv";
 		InputStream inputStream = sftpUtil.downloadStream("pmtrepsap2feishu", fileName);
 		if (inputStream == null) {
-			log.info("无该日期支付同步数据：{}", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+			log.info("无昨日支付同步数据：{}", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
 			return;
 		}
 		// Excel列表数据查询
@@ -88,8 +88,16 @@ public class PaypoolServiceImpl implements PaypoolService {
 				Collectors.collectingAndThen(Collectors.toCollection(() -> new TreeSet<>(
 				Comparator.comparing(FeishuPaypool::getId))),ArrayList::new));
 		log.info("在支付中的支付池: {}", payPoolList.size());
+		List<Boolean> resultList = new ArrayList<>();
 		for (FeishuPaypool paypool : payPoolList) {
-			SignUtil.updatePaypool(paypool.getId(), paypool.getAccountant());
+			resultList.add(SignUtil.updatePaypool(paypool.getId(), paypool.getAccountant()));
+		}
+
+		List<Boolean> resultFilterList = resultList.stream().filter(r -> r).collect(Collectors.toList());
+		log.info("修改成功的单据数: {}", resultFilterList.size());
+		if (resultFilterList.size() < payPoolList.size()) {
+			SignUtil.sendMsg(constants.CHAT_ID_ARG, constants.USER_ID_ARG, "更新支付池支付状态部分失败，请查看日志，需要修改支付状态的单据数：" + payPoolList.size() +
+					"，修改成功的单据数：" + resultFilterList.size());
 		}
 
 		sftpUtil.moveFile("pmtrepsap2feishu", fileName);

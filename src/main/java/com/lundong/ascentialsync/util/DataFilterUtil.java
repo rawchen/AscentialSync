@@ -7,6 +7,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * 数据列表过滤工具
@@ -45,5 +48,17 @@ public class DataFilterUtil {
 		}
 
 		return documentListNew;
+	}
+
+	/**
+	 * 对象集合根据某属性去重
+	 *
+	 * @param keyExtractor
+	 * @return
+	 * @param <T>
+	 */
+	public static <T> Predicate<T> distinctByKey(Function<? super T, Object> keyExtractor) {
+		Map<Object, Boolean> seen = new ConcurrentHashMap<>();
+		return t -> seen.putIfAbsent(keyExtractor.apply(t), Boolean.TRUE) == null;
 	}
 }

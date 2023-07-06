@@ -3,6 +3,8 @@ package com.lundong.ascentialsync.entity.spend;
 import com.alibaba.fastjson.annotation.JSONField;
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * @author RawChen
  * @date 2023-06-01 15:25
@@ -63,5 +65,8 @@ public class Allocation {
 
 	@JSONField(name = "tax_rate")
 	private String taxRate;
+
+	@JSONField(name = "custom_field_list")
+	private List<CustomField> customFieldList;
 
 }

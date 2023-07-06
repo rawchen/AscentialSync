@@ -124,4 +124,16 @@ class AscentialSyncApplicationTests {
 	void getAppId() {
 		System.out.println();
 	}
+
+	@Test
+	void getSpendFormsWithFormCodeList() {
+		List<FeishuPaypool> paypools = new ArrayList<>();
+		paypools.add(new FeishuPaypool().setVendorFormHeaderCode("ER23062700001"));
+		paypools.add(new FeishuPaypool().setVendorFormHeaderCode("ER23062700001"));
+		List<FeishuSpendVoucher> feishuSpendVouchers = SignUtil.spendFormsWithFormCodeList(paypools);
+		for (FeishuSpendVoucher feishuSpendVoucher : feishuSpendVouchers) {
+			System.out.println(feishuSpendVoucher);
+		}
+	}
+
 }

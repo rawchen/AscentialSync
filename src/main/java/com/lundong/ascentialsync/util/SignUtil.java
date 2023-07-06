@@ -541,6 +541,72 @@ public class SignUtil {
 	}
 
 	/**
+	 * 根据多个formCode获取凭证列表
+	 *
+	 * @param accessToken
+	 * @param feishuPaypools
+	 * @return
+	 */
+	public static List<FeishuSpendVoucher> spendFormsWithFormCodeList(String accessToken, List<FeishuPaypool> feishuPaypools) {
+		if (feishuPaypools == null || feishuPaypools.size() == 0) {
+			return Collections.emptyList();
+		}
+		List<FeishuSpendVoucher> vouchers = new ArrayList<>();
+		// 根据formCode去重
+		feishuPaypools = feishuPaypools.stream()
+				.filter(DataFilterUtil.distinctByKey(FeishuPaypool::getVendorFormHeaderCode))
+				.collect(Collectors.toList());
+		for (FeishuPaypool feishuPaypool : feishuPaypools) {
+			Map<String, Object> param = new HashMap<>();
+			param.put("page_size", 20);
+			if (feishuPaypools != null) {
+				param.put("form_code", feishuPaypool.getVendorFormHeaderCode());
+			}
+			while (true) {
+				String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/spend/v1/vouchers/scroll")
+						.header("Authorization", "Bearer " + accessToken)
+						.form(param)
+						.execute()
+						.body();
+//			System.out.println(resultStr);
+				JSONObject jsonObject = JSON.parseObject(resultStr);
+				if (!"0".equals(jsonObject.getString("code"))) {
+					log.info("获取凭证列表失败：{}", resultStr);
+					break;
+				}
+				JSONObject data = (JSONObject) jsonObject.get("data");
+				if (data != null) {
+					JSONArray items = (JSONArray) data.get("items");
+					for (int i = 0; i < items.size(); i++) {
+						// 构造飞书费控凭证
+						FeishuSpendVoucher feishuDept = items.getJSONObject(i).toJavaObject(FeishuSpendVoucher.class);
+						vouchers.add(feishuDept);
+					}
+					if ((boolean) data.get("has_more")) {
+						param.put("page_token", data.getString("page_token"));
+					} else {
+						break;
+					}
+				} else {
+					break;
+				}
+			}
+		}
+		return vouchers;
+	}
+
+	/**
+	 * 获取凭证列表
+	 *
+	 * @param feishuPaypools
+	 * @return
+	 */
+	public static List<FeishuSpendVoucher> spendFormsWithFormCodeList(List<FeishuPaypool> feishuPaypools) {
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
+		return spendFormsWithFormCodeList(accessToken, feishuPaypools);
+	}
+
+	/**
 	 * 更新飞书用户只能定义字段：公司编码、成本中心编码
 	 *
 	 * @return
@@ -573,12 +639,16 @@ public class SignUtil {
 				.body(object.toJSONString())
 				.execute()
 				.body();
+		if (resultStr.contains("504 Gateway Time-out")) {
+			log.info("resultStr: {}", resultStr);
+			return false;
+		}
 //		System.out.println(resultStr);
 		JSONObject jsonObject = JSONObject.parseObject(resultStr);
 		if ("0".equals(jsonObject.getString("code"))) {
 			return true;
 		} else {
-			SignUtil.sendMsg(constants.CHAT_ID_ARG, constants.USER_ID_ARG, "更新CompanyCode/CostCenter失败：" + resultStr);
+			log.info("resultStr: {}", resultStr);
 			return false;
 		}
 	}
@@ -930,6 +1000,69 @@ public class SignUtil {
 	}
 
 	/**
+	 * 遍历支付池获取单据号列表
+	 *
+	 * @param accessToken
+	 * @return
+	 */
+	public static List<FeishuPaypool> paypoolScrollWithTimestamp(String accessToken, Date date) {
+		List<FeishuPaypool> feishuPaypoolList = new ArrayList<>();
+		Map<String, Object> param = new HashMap<>();
+		JSONObject bodyObject = new JSONObject();
+		bodyObject.put("page_size", "100");
+		JSONArray array = new JSONArray();
+		array.add("A1");
+		bodyObject.put("payment_status_codes", array); // 待支付单据列表
+		if (date != null) {
+			bodyObject.put("update_time_before", TimeUtil.timestampToDateFormat(String.valueOf(TimeUtil.getDailyEndTime(date))));
+			bodyObject.put("update_time_after", TimeUtil.timestampToDateFormat(String.valueOf(TimeUtil.getDailyStartTime(date))));
+		}
+		while (true) {
+			String resultStr = HttpRequest.post("https://open.feishu.cn/open-apis/spend/v1/paypools2/scroll?page_token="
+							+ (param.get("page_token") == null ? "" : param.get("page_token")))
+					.header("Authorization", "Bearer " + accessToken)
+//					.form(param)
+					.body(bodyObject.toJSONString())
+					.execute()
+					.body();
+			System.out.println(resultStr);
+			JSONObject jsonObject = JSON.parseObject(resultStr);
+			if (jsonObject != null && "0".equals(jsonObject.getString("code"))) {
+				JSONObject data = (JSONObject) jsonObject.get("data");
+				JSONArray items = (JSONArray) data.get("items");
+				for (int i = 0; i < items.size(); i++) {
+					FeishuPaypool paypool = items.getJSONObject(i).toJavaObject(FeishuPaypool.class);
+					feishuPaypoolList.add(paypool);
+				}
+
+				if (data.getBoolean("has_more")) {
+					param.put("page_token", data.getString("page_token"));
+				} else {
+					break;
+				}
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			} else {
+				break;
+			}
+		}
+		return feishuPaypoolList;
+	}
+
+	/**
+	 * 遍历支付池
+	 *
+	 * @return
+	 */
+	public static List<FeishuPaypool> paypoolScrollWithTimestamp(Date date) {
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
+		return paypoolScrollWithTimestamp(accessToken, date);
+	}
+
+	/**
 	 * 更新支付池支付状态
 	 *
 	 * @param accessToken
@@ -957,7 +1090,6 @@ public class SignUtil {
 			return true;
 		} else {
 			log.info("更新支付池支付状态失败: {}", resultStr);
-			SignUtil.sendMsg(constants.CHAT_ID_ARG, constants.USER_ID_ARG, "更新支付池支付状态失败：" + resultStr);
 			return false;
 		}
 	}
@@ -997,13 +1129,14 @@ public class SignUtil {
 					.body();
 			JSONObject jsonObject = JSON.parseObject(resultStr);
 			if (jsonObject != null && jsonObject.getInteger("code") == 0) {
+				log.info("群消息发送成功：" + content);
 			} else {
-				log.info("调用接口失败: {}", resultStr);
+				log.info("群消息发送接口调用失败: {}", resultStr);
 			}
 		}
 
 		if (userId != null && !"".equals(userId)) {
-			// 发送群消息
+			// 发送用户消息
 			JSONObject bodyObject = new JSONObject();
 			bodyObject.put("receive_id", userId);
 			bodyObject.put("msg_type", "text");
@@ -1015,8 +1148,9 @@ public class SignUtil {
 					.body();
 			JSONObject jsonObject = JSON.parseObject(resultStr);
 			if (jsonObject != null && jsonObject.getInteger("code") == 0) {
+				log.info("用户消息发送成功：" + content);
 			} else {
-				log.info("调用接口失败: {}", resultStr);
+				log.info("用户消息接口调用失败: {}", resultStr);
 			}
 		}
 	}

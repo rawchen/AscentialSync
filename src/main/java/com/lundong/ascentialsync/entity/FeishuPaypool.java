@@ -42,4 +42,10 @@ public class FeishuPaypool {
      */
     @JSONField(name = "accountant")
     private String accountant;
+
+    /**
+     * 业务单据表头编号(form_code)
+     */
+    @JSONField(name = "vendor_form_header_code")
+    private String vendorFormHeaderCode;
 }

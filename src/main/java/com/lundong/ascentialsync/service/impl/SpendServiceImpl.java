@@ -1,14 +1,8 @@
 package com.lundong.ascentialsync.service.impl;
 
 import com.lundong.ascentialsync.config.Constants;
-import com.lundong.ascentialsync.entity.ExcelHeader;
-import com.lundong.ascentialsync.entity.ExcelRecord;
-import com.lundong.ascentialsync.entity.FeishuSpendVoucher;
-import com.lundong.ascentialsync.entity.FeishuUser;
-import com.lundong.ascentialsync.entity.spend.Allocation;
-import com.lundong.ascentialsync.entity.spend.InvoiceDetail;
-import com.lundong.ascentialsync.entity.spend.ReimburseData;
-import com.lundong.ascentialsync.entity.spend.SpendCustomField;
+import com.lundong.ascentialsync.entity.*;
+import com.lundong.ascentialsync.entity.spend.*;
 import com.lundong.ascentialsync.enums.InvoiceTypeEnum;
 import com.lundong.ascentialsync.service.SpendService;
 import com.lundong.ascentialsync.util.*;
@@ -46,6 +40,10 @@ public class SpendServiceImpl implements SpendService {
 	@Scheduled(cron = "0 0 2 ? * *")
 	public void syncSpendData() {
 
+		// 如果当前日期在2023-07-11前，则取只执行一次查（付款状态为A1）条件，直到那天恢复正常读取昨天数据
+//		SignUtil.paypoolScrollWithTimestamp("");
+
+
 		Date date = new Date();
 		Calendar calendar = new GregorianCalendar();
 		calendar.setTime(date);
@@ -55,10 +53,15 @@ public class SpendServiceImpl implements SpendService {
 		List<SpendCustomField> glAccountList = SignUtil.getSpendCustomFields("0000001");
 		List<SpendCustomField> expenseTypeList = SignUtil.getSpendCustomFields("0000002");
 		List<SpendCustomField> taxCodeList = SignUtil.getSpendCustomFields("0000003");
+		List<SpendCustomField> deliveryCentreList = SignUtil.getSpendCustomFields("0000004");
 
 		// 费控列表接口，先获取昨天添加到费控的表单列表
 //		List<FeishuSpendForm> feishuSpendForms = SignUtil.spendForms(date);
-		List<FeishuSpendVoucher> feishuSpendVoucherList = SignUtil.spendFormsWithTimestamp(date);
+//		List<FeishuSpendVoucher> feishuSpendVoucherList = SignUtil.spendFormsWithTimestamp(date);
+
+		// 遍历支付池获取支付状态为A1待支付的单子
+		List<FeishuPaypool> paypoolList = SignUtil.paypoolScrollWithTimestamp(date);
+		List<FeishuSpendVoucher> feishuSpendVoucherList = SignUtil.spendFormsWithFormCodeList(paypoolList);
 		log.info("昨天总单据数量（包含不同version）: {}", feishuSpendVoucherList.size());
 
 		// 过滤出不是支付完成的
@@ -220,6 +223,31 @@ public class SpendServiceImpl implements SpendService {
 											}
 										}
 
+										// DeliveryCentre
+										if (!StringUtil.isEmpty(record.getCostCenter())) {
+											if (deliveryCentreList != null && deliveryCentreList.size() > 0) {
+												for (SpendCustomField deliveryCentre : deliveryCentreList) {
+													if (deliveryCentre.getCode().equals(record.getCostCenter())) {
+														recordNew.setDeliveryCentre(deliveryCentre.getNameI18n());
+														break;
+													}
+												}
+											}
+											// 如果纬度表根据CostCenter找不到就取报销行自己的自定义DeliveryCentre
+											if (StringUtil.isEmpty(recordNew.getDeliveryCentre())) {
+												List<CustomField> customFieldList = allocation.getCustomFieldList();
+												if (customFieldList != null) {
+													for (CustomField customField : customFieldList) {
+														// 字段所在自定义维度编码
+														if ("0001".equals(customField.getFieldCode())) {
+															recordNew.setDeliveryCentre(customField.getFieldValueCode());
+															break;
+														}
+													}
+												}
+											}
+										}
+
 //										String lineDesc = allocation.getLineDesc();
 //										if (lineDesc != null) {
 											// 格式：1405258-廉紫-SAP F2020项目，GB0350WW59\n与同行人Jodie分摊
@@ -263,8 +291,10 @@ public class SpendServiceImpl implements SpendService {
 								}
 								// 接着判断是差旅还是日常报销
 								if (form.getBizUnitCode().contains("EXPENSE_REIMBURSEMENT")) {
-									// 如果费用类型为2005员工福利则税码J0
-									if ("2005".equals(invoiceDetailBizTypeCode)) {
+									// 如果费用类型为“2001体检费、2002团建费、2003零食/下午茶、2005员工福利其他、4004餐饮招待”则税码J0
+									if ("2005".equals(invoiceDetailBizTypeCode) || "2001".equals(invoiceDetailBizTypeCode)
+											|| "2002".equals(invoiceDetailBizTypeCode) || "2003".equals(invoiceDetailBizTypeCode)
+											|| "4004".equals(invoiceDetailBizTypeCode)) {
 										recordNew.setTaxCode("J0");
 										recordNew.setTaxAmount("0");
 										recordNew.setAmountInTransactionCurrency(invoiceDetail.getGrossAmount());
@@ -362,10 +392,12 @@ public class SpendServiceImpl implements SpendService {
 										}
 								}
 
-								// 继续根据税率大于0判断日常报销2005员工福利的税码
+								// 继续根据税率大于0判断如果费用类型为“2001体检费、2002团建费、2003零食/下午茶、2005员工福利其他、4004餐饮招待”则税码J0
 								if (Double.parseDouble(recordNew.getTaxAmount()) > 0) {
 									if (form.getBizUnitCode().contains("EXPENSE_REIMBURSEMENT")) {
-										if ("2005".equals(invoiceDetailBizTypeCode)) {
+										if ("2005".equals(invoiceDetailBizTypeCode) || "2001".equals(invoiceDetailBizTypeCode)
+												|| "2002".equals(invoiceDetailBizTypeCode) || "2003".equals(invoiceDetailBizTypeCode)
+												|| "4004".equals(invoiceDetailBizTypeCode)) {
 											recordNew.setTaxCode("J0");
 											recordNew.setTaxAmount("0");
 											recordNew.setAmountInTransactionCurrency(invoiceDetail.getGrossAmount());

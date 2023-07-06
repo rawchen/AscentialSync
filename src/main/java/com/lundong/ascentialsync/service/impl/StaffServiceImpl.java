@@ -46,7 +46,7 @@ public class StaffServiceImpl implements StaffService {
 		String fileName = "WorkdayFeishu_" + LocalDateTimeUtil.format(LocalDate.now().minusDays(1), "ddMMyyyy") + ".csv";
 		InputStream inputStream = sftpUtil.downloadStream("workday2feishu", fileName);
 		if (inputStream == null) {
-			log.info("无该日期员工同步数据：{}", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+			log.info("无昨日员工同步数据：{}", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
 			return;
 		}
 		// SFTP用户Excel列表数据查询
@@ -108,6 +108,10 @@ public class StaffServiceImpl implements StaffService {
 		}
 		List<Boolean> resultFilterList = resultList.stream().filter(r -> r).collect(Collectors.toList());
 		log.info("修改成功的员工数: {}", resultFilterList.size());
+		if (resultFilterList.size() < excelUsers.size()) {
+			SignUtil.sendMsg(constants.CHAT_ID_ARG, constants.USER_ID_ARG, "更新CompanyCode/CostCenter部分失败，请查看日志。需要同步的员工数: " +
+					excelUsers.size() + "，修改成功的员工数：" + resultList.size());
+		}
 		if (resultFilterList.size() > 0) {
 			// 至少成功修改一个用户的数据
 			sftpUtil.moveFile("workday2feishu", fileName);
