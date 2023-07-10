@@ -51,6 +51,9 @@ public class Allocation {
 	@JSONField(name = "reimburse_line_id")
 	private String reimburseLineId;
 
+	/**
+	 * 报销金额
+	 */
 	@JSONField(name = "reimbursement_amount")
 	private Double reimbursementAmount;
 

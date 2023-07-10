@@ -633,22 +633,40 @@ public class SignUtil {
 		json = json.replaceAll("companyCodeText", user.getCompanyCode());
 		json = json.replaceAll("costCenterCodeText", user.getCostCenterCode());
 		object.put("custom_attrs", JSONArray.parseArray(json));
-		String resultStr = HttpRequest.patch("https://open.feishu.cn/open-apis/contact/v3/users/" + user.getUserId() + "?user_id_type=user_id&department_id_type=department_id")
-				.header("Authorization", "Bearer " + accessToken)
-				.form(param)
-				.body(object.toJSONString())
-				.execute()
-				.body();
+
+		// 重试
+		String resultStr = "";
+		for (int i = 0; i < 3; i++) {
+			resultStr = HttpRequest.patch("https://open.feishu.cn/open-apis/contact/v3/users/" + user.getUserId() + "?user_id_type=user_id&department_id_type=department_id")
+					.header("Authorization", "Bearer " + accessToken)
+					.form(param)
+					.body(object.toJSONString())
+					.execute()
+					.body();
+			if (resultStr.contains("504 Gateway Time-out")) {
+				try {
+					Thread.sleep(2000);
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+				log.info("resultStr: {}", "504 Gateway Time-out, 重试" + (i + 1) + "次");
+			} else {
+				break;
+			}
+		}
+
+		// 重试完检测
 		if (resultStr.contains("504 Gateway Time-out")) {
-			log.info("resultStr: {}", resultStr);
+			log.info("重试3次后失败: {}", " userId: " + user.getUserId());
 			return false;
 		}
+
 //		System.out.println(resultStr);
 		JSONObject jsonObject = JSONObject.parseObject(resultStr);
 		if ("0".equals(jsonObject.getString("code"))) {
 			return true;
 		} else {
-			log.info("resultStr: {}", resultStr);
+			log.info("resultStr: {}", resultStr + " userId: " + user.getUserId());
 			return false;
 		}
 	}
@@ -1025,7 +1043,7 @@ public class SignUtil {
 					.body(bodyObject.toJSONString())
 					.execute()
 					.body();
-			System.out.println(resultStr);
+//			System.out.println(resultStr);
 			JSONObject jsonObject = JSON.parseObject(resultStr);
 			if (jsonObject != null && "0".equals(jsonObject.getString("code"))) {
 				JSONObject data = (JSONObject) jsonObject.get("data");

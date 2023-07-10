@@ -254,7 +254,7 @@ public class SftpUtil {
 			}
 			return sftp.get(downloadFile);
 		} catch (SftpException e) {
-			logger.error("文件下载异常！", e);
+			logger.error("文件下载失败，目录：" + directory + "中的文件: " + downloadFile);
 		}
 		return null;
 	}
@@ -266,8 +266,8 @@ public class SftpUtil {
 	 * @param fileName
 	 */
 	public void moveFile(String directory, String fileName) {
-//		sftp.cd(directory);
 		try {
+			sftp.cd(directory);
 			sftp.rename("/" + directory + "/" + fileName, "/" + directory + "/.archive/" + fileName);
 		} catch (SftpException e) {
 			logger.error("文件移动异常！", e);

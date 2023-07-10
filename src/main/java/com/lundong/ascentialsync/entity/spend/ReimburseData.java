@@ -100,5 +100,8 @@ public class ReimburseData {
 	@JSONField(name = "project_code")
 	private String projectCode;
 
+	@JSONField(name = "project_name")
+	private String projectName;
+
 
 }

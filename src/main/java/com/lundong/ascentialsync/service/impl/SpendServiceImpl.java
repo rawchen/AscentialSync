@@ -40,10 +40,6 @@ public class SpendServiceImpl implements SpendService {
 	@Scheduled(cron = "0 0 2 ? * *")
 	public void syncSpendData() {
 
-		// 如果当前日期在2023-07-11前，则取只执行一次查（付款状态为A1）条件，直到那天恢复正常读取昨天数据
-//		SignUtil.paypoolScrollWithTimestamp("");
-
-
 		Date date = new Date();
 		Calendar calendar = new GregorianCalendar();
 		calendar.setTime(date);
@@ -95,9 +91,12 @@ public class SpendServiceImpl implements SpendService {
 		reimburseDataListNew = reimburseDataListNew.stream().filter(r -> "completed".equals(r.getProcessStatus())).collect(Collectors.toList());
 
 		log.info("过滤后表单数量: {}", reimburseDataListNew.size());
-//		feishuSpendForms = feishuSpendForms.stream().filter(f -> f.getFormCode().equals("TR23060600004")).collect(Collectors.toList());
+//		reimburseDataListNew = reimburseDataListNew.stream().filter(f -> f.getFormCode().equals("TR23060900005")).collect(Collectors.toList());
 //		log.info("过滤后表单数量: {}", feishuSpendForms.size());
 		for (ReimburseData form : reimburseDataListNew) {
+			// 新建一个报销行ID列表
+			// 存储报销总额和发票总额不相等的报销（排除）
+			List<String> reimburseLineIdList = new ArrayList<>();
 			String employeeNo = "";
 			// 通过applicant_id(申请人ID)获取员工ID
 			FeishuUser feishuUser = SignUtil.getFeishuUser(form.getApplicantUid());
@@ -138,6 +137,47 @@ public class SpendServiceImpl implements SpendService {
 				} catch (ParseException e) {
 					throw new RuntimeException(e);
 				}
+				// 某个单据的所有报销数据，在这先过滤价格不对应的单据
+				for (ReimburseData data : reimburseDatas) {
+					if (data.getAllocations() != null && data.getAllocations().size() > 0) {
+						for (Allocation allocation : data.getAllocations()) {
+							BigDecimal invoiceGrossAmount = new BigDecimal("0.0");
+							// 根据每行报账数据的lineId获取
+							for (InvoiceDetail invoiceDetail : data.getInvoiceDetailList()) {
+								if (allocation.getReimburseLineId().equals(invoiceDetail.getReimburseLineId())) {
+									// 累加发票额
+									invoiceGrossAmount = invoiceGrossAmount.add(new BigDecimal(invoiceDetail.getGrossAmount()));
+								}
+							}
+//							System.out.println(invoiceGrossAmount + "  " + allocation.getReimbursementAmount());
+							// 判断同一报销行id的报销总额和发票总额是否相同，（不包含有报销没发票的，后面处理）
+//							if (invoiceGrossAmount != allocation.getReimbursementAmount() && invoiceGrossAmount != 0) {
+							if(invoiceGrossAmount.compareTo(BigDecimal.valueOf(allocation.getReimbursementAmount())) != 0) {
+								// 如果金额不相同
+								// 记录当前报销行id,供后面修改
+								String lineId = allocation.getReimburseLineId();
+								reimburseLineIdList.add(lineId);
+								for (InvoiceDetail invoiceDetail : data.getInvoiceDetailList()) {
+									if (invoiceDetail.getReimburseLineId().equals(lineId)) {
+										invoiceDetail.setGrossAmount(String.valueOf(allocation.getReimbursementAmount()));
+										invoiceDetail.setExcludeTaxAmount(String.valueOf(allocation.getReimbursementAmount()));
+									}
+								}
+							}
+						}
+					}
+				}
+
+				// 单据审批结束时间approvedTime如果早于2023-07-11，则更改为它
+				try {
+					Date newDate = new SimpleDateFormat("yyyy-MM-dd").parse("2023-07-11");
+					if (approvedTime.before(newDate)) {
+						approvedTime = newDate;
+					}
+				} catch (ParseException e) {
+					throw new RuntimeException(e);
+				}
+
 				// 通过获取的单据生成表头
 				ExcelHeader header = ExcelHeader.builder()
 						.journalEntry("1")
@@ -165,6 +205,7 @@ public class SpendServiceImpl implements SpendService {
 					for (InvoiceDetail invoiceDetail : invoiceDetailList) {
 						String invoiceDetailBizTypeCode = "";
 						ExcelRecord record = ExcelRecord.builder()
+								.reimburseLineId(invoiceDetail.getReimburseLineId())
 								.journalEntry("1")
 								.companyCode("")
 								.glAccount("") //费用类型对应
@@ -172,7 +213,8 @@ public class SpendServiceImpl implements SpendService {
 								.amountInTransactionCurrency(invoiceDetail.getGrossAmount())	// 区分含税和不含税
 								.documentItemText("")
 								.debitCreditCode("")	// 借记代码
-								.wbsElement(StringUtil.nullIsEmpty(reimburseData.getProjectCode()))
+//								.wbsElement(StringUtil.nullIsEmpty(StringUtil.getZhCustomFie(reimburseData.getProjectName())))
+								.wbsElement("")
 								.assignmentReference("")
 								.taxCode("") // 税码
 								.deliveryCentre("")
@@ -224,10 +266,10 @@ public class SpendServiceImpl implements SpendService {
 										}
 
 										// DeliveryCentre
-										if (!StringUtil.isEmpty(record.getCostCenter())) {
+										if (!StringUtil.isEmpty(recordNew.getCostCenter())) {
 											if (deliveryCentreList != null && deliveryCentreList.size() > 0) {
 												for (SpendCustomField deliveryCentre : deliveryCentreList) {
-													if (deliveryCentre.getCode().equals(record.getCostCenter())) {
+													if (deliveryCentre.getCode().equals(recordNew.getCostCenter())) {
 														recordNew.setDeliveryCentre(deliveryCentre.getNameI18n());
 														break;
 													}
@@ -363,8 +405,30 @@ public class SpendServiceImpl implements SpendService {
 										}
 										break;
 									case AIR_TICKET_ITINERARY:
+										// 航空机票行程单
+										// 通过发票报销行ID获取报销总额
+										// 设置税码和税额为空（后续修改为税码J0税额0）
+										// 标记发票报销行ID
+										List<Allocation> allocations = reimburseData.getAllocations();
+										if (allocations != null) {
+											for (Allocation allocation : allocations) {
+												if (invoiceDetail.getReimburseLineId().equals(allocation.getReimburseLineId())) {
+													record.setAmountInTransactionCurrency(String.valueOf(allocation.getReimbursementAmount()));
+													recordNew.setAmountInTransactionCurrency(String.valueOf(allocation.getReimbursementAmount()));
+													break;
+												}
+											}
+										}
+										record.setTaxCode("");
+										recordNew.setTaxCode("J0");
+										record.setTaxAmount("");
+										recordNew.setTaxAmount("0");
+										record.setReimburseLineId(invoiceDetail.getReimburseLineId());
+										recordNew.setReimburseLineId(invoiceDetail.getReimburseLineId());
+										reimburseLineIdList.add(invoiceDetail.getReimburseLineId());
+										break;
 									case TRAIN_TICKET:
-										// 航空机票行程单/火车票
+										// 火车票
 										for (SpendCustomField taxCode : taxCodeList) {
 											if (taxCode.getNameI18n().toLowerCase().startsWith("9% transportation input vat")) {
 												recordNew.setTaxCode(taxCode.getCode());
@@ -564,10 +628,57 @@ public class SpendServiceImpl implements SpendService {
 								}
 							}
 						}
+
+						// DeliveryCentre
+						if (!StringUtil.isEmpty(recordNew.getCostCenter())) {
+							if (deliveryCentreList != null && deliveryCentreList.size() > 0) {
+								for (SpendCustomField deliveryCentre : deliveryCentreList) {
+									if (deliveryCentre.getCode().equals(recordNew.getCostCenter())) {
+										recordNew.setDeliveryCentre(deliveryCentre.getNameI18n());
+										break;
+									}
+								}
+							}
+							// 如果纬度表根据CostCenter找不到就取报销行自己的自定义DeliveryCentre
+							if (StringUtil.isEmpty(recordNew.getDeliveryCentre())) {
+								List<CustomField> customFieldList = allocation.getCustomFieldList();
+								if (customFieldList != null) {
+									for (CustomField customField : customFieldList) {
+										// 字段所在自定义维度编码
+										if ("0001".equals(customField.getFieldCode())) {
+											recordNew.setDeliveryCentre(customField.getFieldValueCode());
+											break;
+										}
+									}
+								}
+							}
+						}
+
 						excelRecords.add(record);
 						excelRecords.add(recordNew);
 					}
+//					System.out.println(reimburseLineIdList);
+
+					// 去重
+					reimburseLineIdList = reimburseLineIdList.stream().distinct().collect(Collectors.toList());
+
+					// excelRecords根据reimburseLineIdList去重
+					excelRecords = DataFilterUtil.distinctByReimburseLineId(excelRecords, reimburseLineIdList);
+
+					// excelRecords中reimburseLineId不为空的设置税码，税额为空（后续修改为税码J0税额0）
+					for (ExcelRecord excelRecord : excelRecords) {
+						if (reimburseLineIdList.contains(excelRecord.getReimburseLineId())) {
+							if ("H".equals(excelRecord.getDebitCreditCode())) {
+								excelRecord.setTaxCode("");
+								excelRecord.setTaxAmount("");
+							} else if ("S".equals(excelRecord.getDebitCreditCode())) {
+								excelRecord.setTaxCode("J0");
+								excelRecord.setTaxAmount("0");
+							}
+						}
+					}
 				}
+
 
 				// 生成上传CSV到SFTP
 				try {

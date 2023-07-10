@@ -110,11 +110,13 @@ public class StaffServiceImpl implements StaffService {
 		log.info("修改成功的员工数: {}", resultFilterList.size());
 		if (resultFilterList.size() < excelUsers.size()) {
 			SignUtil.sendMsg(constants.CHAT_ID_ARG, constants.USER_ID_ARG, "更新CompanyCode/CostCenter部分失败，请查看日志。需要同步的员工数: " +
-					excelUsers.size() + "，修改成功的员工数：" + resultList.size());
+					excelUsers.size() + "，修改成功的员工数：" + resultFilterList.size());
 		}
 		if (resultFilterList.size() > 0) {
 			// 至少成功修改一个用户的数据
-			sftpUtil.moveFile("workday2feishu", fileName);
+			SftpUtil sftpUtilNew = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
+			sftpUtilNew.login();
+			sftpUtilNew.moveFile("workday2feishu", fileName);
 		}
 	}
 }

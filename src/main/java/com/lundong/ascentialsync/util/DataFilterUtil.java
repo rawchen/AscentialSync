@@ -1,5 +1,6 @@
 package com.lundong.ascentialsync.util;
 
+import com.lundong.ascentialsync.entity.ExcelRecord;
 import com.lundong.ascentialsync.entity.spend.ReimburseData;
 import lombok.extern.slf4j.Slf4j;
 
@@ -60,5 +61,42 @@ public class DataFilterUtil {
 	public static <T> Predicate<T> distinctByKey(Function<? super T, Object> keyExtractor) {
 		Map<Object, Boolean> seen = new ConcurrentHashMap<>();
 		return t -> seen.putIfAbsent(keyExtractor.apply(t), Boolean.TRUE) == null;
+	}
+
+	/**
+	 * 根据保账行ID在excelRecords中去重，留下同一报销ID的两条
+	 *
+	 * @param excelRecords
+	 * @param reimburseLineIdList
+	 * @return
+	 */
+	public static List<ExcelRecord> distinctByReimburseLineId(List<ExcelRecord> excelRecords, List<String> reimburseLineIdList) {
+		List<ExcelRecord> records = new ArrayList<>();
+		for (String s : reimburseLineIdList) {
+			List<ExcelRecord> list = new ArrayList<>();
+			for (ExcelRecord excelRecord : excelRecords) {
+				if (excelRecord.getReimburseLineId() != null && excelRecord.getReimburseLineId().equals(s)) {
+					list.add(excelRecord);
+				}
+			}
+			// 如果list数量大于2
+			if (list.size() > 2) {
+				// 取出最后2个
+				List<ExcelRecord> listTemp = new ArrayList<>();
+				listTemp.add(list.get(list.size() - 2));
+				listTemp.add(list.get(list.size() - 1));
+				records.addAll(listTemp);
+			} else {
+				records.addAll(list);
+			}
+		}
+
+		// 取出excelRecords中不包含reimburseLineIdList的
+		for (ExcelRecord excelRecord : excelRecords) {
+			if (!reimburseLineIdList.contains(excelRecord.getReimburseLineId())) {
+				records.add(excelRecord);
+			}
+		}
+		return records;
 	}
 }

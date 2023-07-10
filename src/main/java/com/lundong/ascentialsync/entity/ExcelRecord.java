@@ -1,5 +1,6 @@
 package com.lundong.ascentialsync.entity;
 
+import com.alibaba.excel.annotation.ExcelIgnore;
 import com.alibaba.excel.annotation.ExcelProperty;
 import lombok.Builder;
 import lombok.Data;
@@ -89,5 +90,11 @@ public class ExcelRecord {
 	 */
 	@ExcelProperty(index = 12)
 	private String deliveryCentre;
+
+	/**
+	 * 报销行ID
+	 */
+	@ExcelIgnore
+	private String reimburseLineId;
 
 }

@@ -1,11 +1,13 @@
 package com.lundong.ascentialsync;
 
+import cn.hutool.http.HttpRequest;
 import com.lundong.ascentialsync.config.Constants;
 import com.lundong.ascentialsync.entity.*;
 import com.lundong.ascentialsync.util.ExcelUtil;
 import com.lundong.ascentialsync.util.SftpUtil;
 import com.lundong.ascentialsync.util.SignUtil;
 import com.lundong.ascentialsync.util.TimeUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+@Slf4j
 @SpringBootTest
 class AscentialSyncApplicationTests {
 
@@ -133,6 +136,37 @@ class AscentialSyncApplicationTests {
 		List<FeishuSpendVoucher> feishuSpendVouchers = SignUtil.spendFormsWithFormCodeList(paypools);
 		for (FeishuSpendVoucher feishuSpendVoucher : feishuSpendVouchers) {
 			System.out.println(feishuSpendVoucher);
+		}
+	}
+
+	@Test
+	void testReTry() {
+		// 重试
+		String resultStr = "";
+		for (int i = 0; i < 3; i++) {
+			resultStr = HttpRequest.get("https://rawchen.com/")
+
+					.form("")
+					.body("")
+					.execute()
+					.body();
+			if (resultStr.contains("502 Bad Gateway")) {
+				try {
+					Thread.sleep(2000);
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+				log.info("resultStr: {}", "504 Gateway Time-out, 重试" + (i + 1) + "次");
+			} else {
+				break;
+			}
+		}
+
+		System.out.println(resultStr);
+
+		// 重试完检测
+		if (resultStr.contains("502 Bad Gateway")) {
+			log.info("重试3次后失败: {}", "userId: " + "123");
 		}
 	}
 

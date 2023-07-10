@@ -100,7 +100,9 @@ public class PaypoolServiceImpl implements PaypoolService {
 					"，修改成功的单据数：" + resultFilterList.size());
 		}
 
-		sftpUtil.moveFile("pmtrepsap2feishu", fileName);
+		SftpUtil sftpUtilNew = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
+		sftpUtilNew.login();
+		sftpUtilNew.moveFile("pmtrepsap2feishu", fileName);
 
 		log.info("支付池支付状态更新结束。");
 	}
