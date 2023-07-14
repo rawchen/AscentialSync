@@ -106,7 +106,7 @@ class AscentialSyncApplicationTests {
 	void moveFile() {
 		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
 		sftpUtil.login();
-		sftpUtil.moveFile("workday2feishu", "WorkdayFeishu_06062023.csv");
+		sftpUtil.moveFile("workday2feishu", "WorkdayFeishu_10072023.csv");
 	}
 
 	@Test

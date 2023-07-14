@@ -268,6 +268,15 @@ public class SftpUtil {
 	public void moveFile(String directory, String fileName) {
 		try {
 			sftp.cd(directory);
+			try {
+				//如果文件夹不存在，则创建文件夹
+				if (sftp.ls("/" + directory + "/.archive/") == null) {
+					sftp.mkdir("/" + directory + "/.archive/");
+				}
+			} catch (SftpException e) {
+				//创建不存在的文件夹，并切换到文件夹
+				sftp.mkdir("/" + directory + "/.archive/");
+			}
 			sftp.rename("/" + directory + "/" + fileName, "/" + directory + "/.archive/" + fileName);
 		} catch (SftpException e) {
 			logger.error("文件移动异常！", e);
