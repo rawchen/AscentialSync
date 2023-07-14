@@ -665,15 +665,18 @@ public class SpendServiceImpl implements SpendService {
 					// excelRecords根据reimburseLineIdList去重
 					excelRecords = DataFilterUtil.distinctByReimburseLineId(excelRecords, reimburseLineIdList);
 
-					// excelRecords中reimburseLineId不为空的设置税码，税额为空（后续修改为税码J0税额0）
-					for (ExcelRecord excelRecord : excelRecords) {
-						if (reimburseLineIdList.contains(excelRecord.getReimburseLineId())) {
-							if ("H".equals(excelRecord.getDebitCreditCode())) {
-								excelRecord.setTaxCode("");
-								excelRecord.setTaxAmount("");
-							} else if ("S".equals(excelRecord.getDebitCreditCode())) {
-								excelRecord.setTaxCode("J0");
-								excelRecord.setTaxAmount("0");
+					// excelRecords中reimburseLineId不为空的设置税码，税额为空（后续修改为税码J0税额0），且更改贷方交易金额为借方交易金额
+					for (int i = 0; i < excelRecords.size(); i++) {
+						if (reimburseLineIdList.contains(excelRecords.get(i).getReimburseLineId())) {
+							if ("H".equals(excelRecords.get(i).getDebitCreditCode())) {
+								excelRecords.get(i).setTaxCode("");
+								excelRecords.get(i).setTaxAmount("");
+							} else if ("S".equals(excelRecords.get(i).getDebitCreditCode())) {
+								if (excelRecords.get(i - 1) != null) {
+									excelRecords.get(i).setAmountInTransactionCurrency(excelRecords.get(i - 1).getAmountInTransactionCurrency());
+								}
+								excelRecords.get(i).setTaxCode("J0");
+								excelRecords.get(i).setTaxAmount("0");
 							}
 						}
 					}
