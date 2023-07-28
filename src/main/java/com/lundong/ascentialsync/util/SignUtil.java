@@ -1089,8 +1089,9 @@ public class SignUtil {
 	 * @return
 	 */
 	public static boolean updatePaypool(String accessToken, String id, String accountant) {
+		// 更新为支付中
 		JSONObject bodyObject = new JSONObject();
-		bodyObject.put("payment_status_code", "A5");
+		bodyObject.put("payment_status_code", "A3");
 		bodyObject.put("modifier", accountant);
 		String resultStr = HttpRequest.patch("https://open.feishu.cn/open-apis/spend/v1/paypools2/" + id)
 				.header("Authorization", "Bearer " + accessToken)
@@ -1098,16 +1099,38 @@ public class SignUtil {
 				.execute()
 				.body();
 		try {
-			Thread.sleep(1000);
+			Thread.sleep(500);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		// 更新为已支付
+		JSONObject bodyObjectPayed = new JSONObject();
+		bodyObjectPayed.put("payment_status_code", "A5");
+		bodyObjectPayed.put("modifier", accountant);
+		String resultStrPayed = HttpRequest.patch("https://open.feishu.cn/open-apis/spend/v1/paypools2/" + id)
+				.header("Authorization", "Bearer " + accessToken)
+				.body(bodyObjectPayed.toJSONString())
+				.execute()
+				.body();
+		try {
+			Thread.sleep(500);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
 //		System.out.println(resultStr);
 		JSONObject jsonObject = JSON.parseObject(resultStr);
-		if (jsonObject != null && jsonObject.getInteger("code") == 0) {
+		JSONObject jsonObjectPayed = JSON.parseObject(resultStrPayed);
+
+
+		if (jsonObject != null && jsonObject.getInteger("code") == 0
+				&& jsonObjectPayed != null && jsonObjectPayed.getInteger("code") == 0) {
 			return true;
 		} else {
-			log.info("更新支付池支付状态失败: {}", resultStr);
+			if (jsonObject == null || jsonObject.getInteger("code") != 0) {
+				log.info("更新支付池支付状态为“支付中”失败: {}，支付池ID: {}", resultStr, id);
+			} else if (jsonObjectPayed == null || jsonObjectPayed.getInteger("code") != 0) {
+				log.info("更新支付池支付状态为“支付成功”失败: {}，支付池ID: {}", resultStrPayed, id);
+			}
 			return false;
 		}
 	}

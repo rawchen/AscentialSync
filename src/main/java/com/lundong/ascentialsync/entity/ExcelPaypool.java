@@ -16,7 +16,7 @@ public class ExcelPaypool {
 	/**
 	 * 单据编号
 	 */
-	@ExcelProperty(index = 1)
+	@ExcelProperty(index = 2)
 	private String documentReferenceId;
 
 }

@@ -65,12 +65,12 @@ public class PaypoolServiceImpl implements PaypoolService {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
+//		System.out.println(excelPaypools.size());
 		excelPaypools = excelPaypools.stream().collect(
 				Collectors.collectingAndThen(Collectors.toCollection(() -> new TreeSet<>(
 						Comparator.comparing(ExcelPaypool::getDocumentReferenceId))),
 						ArrayList::new));
-		log.info("需要同步的支付数: {}", excelPaypools.size());
+		log.info("提取单据的支付数: {}", excelPaypools.size());
 
 		// 通过单据查看支付池id
 		List<FeishuPaypool> payPoolList = new ArrayList<>();
@@ -79,7 +79,7 @@ public class PaypoolServiceImpl implements PaypoolService {
 			List<FeishuPaypool> paypools = SignUtil.getPaypools(excelPaypool.getDocumentReferenceId());
 			for (FeishuPaypool paypool : paypools) {
 				// A1待支付 A3支付中 A5支付成功
-				if ("A1".equals(paypool.getPaymentStatusCode()) || "A3".equals(paypool.getPaymentStatusCode())) {
+				if ("A1".equals(paypool.getPaymentStatusCode())) {
 					payPoolList.add(new FeishuPaypool().setId(paypool.getId()).setAccountant(paypool.getAccountant()));
 				}
 			}
@@ -87,7 +87,7 @@ public class PaypoolServiceImpl implements PaypoolService {
 		payPoolList = payPoolList.stream().collect(
 				Collectors.collectingAndThen(Collectors.toCollection(() -> new TreeSet<>(
 				Comparator.comparing(FeishuPaypool::getId))),ArrayList::new));
-		log.info("在支付中的支付池: {}", payPoolList.size());
+		log.info("在待支付的支付池: {}", payPoolList.size());
 		List<Boolean> resultList = new ArrayList<>();
 		for (FeishuPaypool paypool : payPoolList) {
 			resultList.add(SignUtil.updatePaypool(paypool.getId(), paypool.getAccountant()));
@@ -96,7 +96,7 @@ public class PaypoolServiceImpl implements PaypoolService {
 		List<Boolean> resultFilterList = resultList.stream().filter(r -> r).collect(Collectors.toList());
 		log.info("修改成功的单据数: {}", resultFilterList.size());
 		if (resultFilterList.size() < payPoolList.size()) {
-			SignUtil.sendMsg(constants.CHAT_ID_ARG, constants.USER_ID_ARG, "更新支付池支付状态部分失败，请查看日志，需要修改支付状态的单据数：" + payPoolList.size() +
+			SignUtil.sendMsg(constants.CHAT_ID_ARG, constants.USER_ID_ARG, "更新支付池支付状态部分失败，请查看日志，" + "导出表的单据数：" + excelPaypools.size() + "，过滤待支付或支付中的单据数：" + payPoolList.size() +
 					"，修改成功的单据数：" + resultFilterList.size());
 		}
 
