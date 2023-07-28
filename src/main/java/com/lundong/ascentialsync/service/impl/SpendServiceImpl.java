@@ -355,11 +355,16 @@ public class SpendServiceImpl implements SpendService {
 												// 提取税率，税额
 												String invoiceTaxRate = invoiceDetail.getInvoiceTaxRate();
 												if (invoiceTaxRate != null) {
-													invoiceTaxRate = StringUtil.taxRateFormat(invoiceTaxRate);
-													for (SpendCustomField taxCode : taxCodeList) {
-														if (taxCode.getNameI18n().toLowerCase().startsWith(invoiceTaxRate + " transportation input vat")) {
-															recordNew.setTaxCode(taxCode.getCode());
-															break OUT;
+													// 免税
+													if (invoiceTaxRate.startsWith("-999")) {
+														recordNew.setTaxCode("J0");
+													} else {
+														invoiceTaxRate = StringUtil.taxRateFormat(invoiceTaxRate);
+														for (SpendCustomField taxCode : taxCodeList) {
+															if (taxCode.getNameI18n().toLowerCase().startsWith(invoiceTaxRate + " transportation input vat")) {
+																recordNew.setTaxCode(taxCode.getCode());
+																break OUT;
+															}
 														}
 													}
 												}
