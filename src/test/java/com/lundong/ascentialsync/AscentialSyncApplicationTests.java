@@ -1,6 +1,7 @@
 package com.lundong.ascentialsync;
 
 import cn.hutool.http.HttpRequest;
+import com.alibaba.fastjson.JSONObject;
 import com.lundong.ascentialsync.config.Constants;
 import com.lundong.ascentialsync.entity.*;
 import com.lundong.ascentialsync.util.ExcelUtil;
@@ -144,8 +145,7 @@ class AscentialSyncApplicationTests {
 		// 重试
 		String resultStr = "";
 		for (int i = 0; i < 3; i++) {
-			resultStr = HttpRequest.get("https://rawchen.com/")
-
+			resultStr = HttpRequest.get("https://baidu.com/")
 					.form("")
 					.body("")
 					.execute()
@@ -161,12 +161,40 @@ class AscentialSyncApplicationTests {
 				break;
 			}
 		}
-
 		System.out.println(resultStr);
-
 		// 重试完检测
 		if (resultStr.contains("502 Bad Gateway")) {
 			log.info("重试3次后失败: {}", "userId: " + "123");
+		}
+	}
+
+	@Test
+	void testReTry02() {
+		// 重试
+		String resultStr = "";
+		JSONObject jsonObject = null;
+		for (int i = 0; i < 3; i++) {
+			resultStr = HttpRequest.get("http://127.0.0.1:8088/feishu/webhook/event1")
+					.execute()
+					.body();
+			try {
+				jsonObject = JSONObject.parseObject(resultStr);
+			} catch (Exception e) {
+				log.error("json解析失败, 重试 {} 次, message: {}, body: {}", i + 1,e.getMessage() , resultStr);
+			}
+			if (jsonObject != null) {
+				break;
+			}
+		}
+		// 重试完检测
+		if (jsonObject == null) {
+			log.info("重试3次后失败");
+
+		}
+		if ("null".equals(jsonObject.getString("msg"))) {
+			System.out.println("success");
+		} else {
+			log.info("resultStr: {}", resultStr);
 		}
 	}
 

@@ -371,7 +371,7 @@ public class SignUtil {
 //			System.out.println(resultStr);
 			JSONObject jsonObject = JSON.parseObject(resultStr);
 			if (!"0".equals(jsonObject.getString("code"))) {
-				log.info("获取凭证列表失败：{}", resultStr);
+				log.error("获取凭证列表失败：{}", resultStr);
 				break;
 			}
 			JSONObject data = (JSONObject) jsonObject.get("data");
@@ -505,7 +505,7 @@ public class SignUtil {
 //			System.out.println(resultStr);
 			JSONObject jsonObject = JSON.parseObject(resultStr);
 			if (!"0".equals(jsonObject.getString("code"))) {
-				log.info("获取凭证列表失败：{}", resultStr);
+				log.error("获取凭证列表失败：{}", resultStr);
 				break;
 			}
 			JSONObject data = (JSONObject) jsonObject.get("data");
@@ -571,7 +571,7 @@ public class SignUtil {
 //			System.out.println(resultStr);
 				JSONObject jsonObject = JSON.parseObject(resultStr);
 				if (!"0".equals(jsonObject.getString("code"))) {
-					log.info("获取凭证列表失败：{}", resultStr);
+					log.error("获取凭证列表失败：{}", resultStr);
 					break;
 				}
 				JSONObject data = (JSONObject) jsonObject.get("data");
@@ -636,6 +636,7 @@ public class SignUtil {
 
 		// 重试
 		String resultStr = "";
+		JSONObject jsonObject = null;
 		for (int i = 0; i < 3; i++) {
 			resultStr = HttpRequest.patch("https://open.feishu.cn/open-apis/contact/v3/users/" + user.getUserId() + "?user_id_type=user_id&department_id_type=department_id")
 					.header("Authorization", "Bearer " + accessToken)
@@ -643,30 +644,29 @@ public class SignUtil {
 					.body(object.toJSONString())
 					.execute()
 					.body();
-			if (resultStr.contains("504 Gateway Time-out")) {
+			try {
+				jsonObject = JSONObject.parseObject(resultStr);
+			} catch (Exception e) {
+				log.error("json解析失败, 重试 {} 次, message: {}, body: {}", i + 1,e.getMessage() , resultStr);
 				try {
-					Thread.sleep(2000);
-				} catch (InterruptedException e) {
-					throw new RuntimeException(e);
+					Thread.sleep(1000);
+				} catch (InterruptedException ex) {
+					throw new RuntimeException(ex);
 				}
-				log.info("resultStr: {}", "504 Gateway Time-out, 重试" + (i + 1) + "次");
-			} else {
+			}
+			if (jsonObject != null) {
 				break;
 			}
 		}
-
 		// 重试完检测
-		if (resultStr.contains("504 Gateway Time-out")) {
-			log.info("重试3次后失败: {}", " userId: " + user.getUserId());
+		if (jsonObject == null) {
+			log.error("重试3次后失败: {}", " userId: " + user.getUserId());
 			return false;
 		}
-
-//		System.out.println(resultStr);
-		JSONObject jsonObject = JSONObject.parseObject(resultStr);
 		if ("0".equals(jsonObject.getString("code"))) {
 			return true;
 		} else {
-			log.info("resultStr: {}", resultStr + " userId: " + user.getUserId());
+			log.error("接口请求不成功: {}", resultStr + " userId: " + user.getUserId());
 			return false;
 		}
 	}
@@ -1127,9 +1127,9 @@ public class SignUtil {
 			return true;
 		} else {
 			if (jsonObject == null || jsonObject.getInteger("code") != 0) {
-				log.info("更新支付池支付状态为“支付中”失败: {}，支付池ID: {}", resultStr, id);
+				log.error("更新支付池支付状态为“支付中”失败: {}，支付池ID: {}", resultStr, id);
 			} else if (jsonObjectPayed == null || jsonObjectPayed.getInteger("code") != 0) {
-				log.info("更新支付池支付状态为“支付成功”失败: {}，支付池ID: {}", resultStrPayed, id);
+				log.error("更新支付池支付状态为“支付成功”失败: {}，支付池ID: {}", resultStrPayed, id);
 			}
 			return false;
 		}
@@ -1172,7 +1172,7 @@ public class SignUtil {
 			if (jsonObject != null && jsonObject.getInteger("code") == 0) {
 				log.info("群消息发送成功：" + content);
 			} else {
-				log.info("群消息发送接口调用失败: {}", resultStr);
+				log.error("群消息发送接口调用失败: {}", resultStr);
 			}
 		}
 
@@ -1191,7 +1191,7 @@ public class SignUtil {
 			if (jsonObject != null && jsonObject.getInteger("code") == 0) {
 				log.info("用户消息发送成功：" + content);
 			} else {
-				log.info("用户消息接口调用失败: {}", resultStr);
+				log.error("用户消息接口调用失败: {}", resultStr);
 			}
 		}
 	}
