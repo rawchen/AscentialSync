@@ -93,6 +93,8 @@ public class SpendServiceImpl implements SpendService {
 		log.info("过滤后表单数量: {}", reimburseDataListNew.size());
 //		reimburseDataListNew = reimburseDataListNew.stream().filter(f -> f.getFormCode().equals("TR23060900005")).collect(Collectors.toList());
 //		log.info("过滤后表单数量: {}", feishuSpendForms.size());
+
+		List<GenerateEntity> generateEntityList = new ArrayList<>();
 		for (ReimburseData form : reimburseDataListNew) {
 			// 新建一个报销行ID列表
 			// 存储报销总额和发票总额不相等的报销（排除）
@@ -257,13 +259,20 @@ public class SpendServiceImpl implements SpendService {
 									if (reimburseLineId.equals(allocation.getReimburseLineId())) {
 										invoiceDetailBizTypeCode = allocation.getBizTypeCode();
 										// 获取分摊行的行事由
-										if (invoiceDetailBizTypeCode != null) {
-											for (SpendCustomField customField : expenseTypeList) {
-												if (customField.getCode().equals(invoiceDetailBizTypeCode)) {
-													recordNew.setDocumentItemText(customField.getNameI18n());
-												}
-											}
-										}
+										// 2023.09.06 需求变更：更改行事由为 用户名+报销类别+报销事由
+//										if (invoiceDetailBizTypeCode != null) {
+//											for (SpendCustomField customField : expenseTypeList) {
+//												if (customField.getCode().equals(invoiceDetailBizTypeCode)) {
+//													recordNew.setDocumentItemText(customField.getNameI18n());
+//												}
+//											}
+//										}
+//										String lineDesc = allocation.getLineDesc();
+										String applyReason = reimburseData.getApplyReason();
+										String docItemTextResult = StringUtil.generateDocItemText(
+												SignUtil.getFeishuUser(form.getApplicantUid()), form.getFormCode() , applyReason);
+										recordNew.setDocumentItemText(docItemTextResult);
+										record.setDocumentItemText(docItemTextResult);
 
 										// DeliveryCentre
 										if (!StringUtil.isEmpty(recordNew.getCostCenter())) {
@@ -290,14 +299,6 @@ public class SpendServiceImpl implements SpendService {
 											}
 										}
 
-//										String lineDesc = allocation.getLineDesc();
-//										if (lineDesc != null) {
-											// 格式：1405258-廉紫-SAP F2020项目，GB0350WW59\n与同行人Jodie分摊
-											// 截取第二个横杠开始到最后
-//											lineDesc = lineDesc.substring(lineDesc.indexOf("-", lineDesc.indexOf("-") + 1) + 1);
-//											lineDesc = lineDesc.replaceAll("\n", " ");
-//											recordNew.setDocumentItemText(lineDesc);
-//										}
 										// 获取分摊行费用类型biz_type_code
 										String bizTypeCode = allocation.getBizTypeCode();
 										if (bizTypeCode != null) {
@@ -620,12 +621,12 @@ public class SpendServiceImpl implements SpendService {
 						String invoiceDetailBizTypeCode = allocation.getBizTypeCode();
 						// 自定义维度表取报销行备注（费用类型），GLaccount费用类型代码
 						if (invoiceDetailBizTypeCode != null) {
-							for (SpendCustomField customField : expenseTypeList) {
-								if (customField.getCode().equals(invoiceDetailBizTypeCode)) {
-									recordNew.setDocumentItemText(customField.getNameI18n());
-									break;
-								}
-							}
+//							for (SpendCustomField customField : expenseTypeList) {
+//								if (customField.getCode().equals(invoiceDetailBizTypeCode)) {
+//									recordNew.setDocumentItemText(customField.getNameI18n());
+//									break;
+//								}
+//							}
 							for (SpendCustomField customField : glAccountList) {
 								if (customField.getCode().equals(invoiceDetailBizTypeCode)) {
 									recordNew.setGlAccount(customField.getNameI18n());
@@ -633,6 +634,12 @@ public class SpendServiceImpl implements SpendService {
 								}
 							}
 						}
+
+						String applyReason = reimburseData.getApplyReason();
+						String docItemTextResult = StringUtil.generateDocItemText(
+								SignUtil.getFeishuUser(form.getApplicantUid()), form.getFormCode() , applyReason);
+						recordNew.setDocumentItemText(docItemTextResult);
+						record.setDocumentItemText(docItemTextResult);
 
 						// DeliveryCentre
 						if (!StringUtil.isEmpty(recordNew.getCostCenter())) {
@@ -691,29 +698,64 @@ public class SpendServiceImpl implements SpendService {
 				// 生成上传CSV到SFTP
 				try {
 					String fileName = employeeNo + "_" + new SimpleDateFormat("ddMMyyyyHHmmss").format(new Date()) +".csv";
-					SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
-					sftpUtil.login();
 					ByteArrayOutputStream baos = new ByteArrayOutputStream();
 //					baos.write(0xef);
 //					baos.write(0xbb);
 //					baos.write(0xbf);
 					ExcelUtil.generateCsv(header, excelRecords, baos);
-//					FileOutputStream fos = new FileOutputStream("C:\\" + fileName);
+//					FileOutputStream fos = new FileOutputStream("/Users/rawchen/" + fileName);
 					//追加BOM标识
 //					fos.write(0xef);
 //					fos.write(0xbb);
 //					fos.write(0xbf);
 //					fos.write(baos.toByteArray());
 //					fos.close();
-
-					sftpUtil.upload("expfeishu2sap", fileName, baos.toByteArray());
-					log.info("生成CSV文件：{}", fileName);
+					generateEntityList.add(new GenerateEntity()
+							.setByteArrayOutputStream(baos)
+							.setFileName(fileName)
+							.setFormCode(form.getFormCode()));
 					baos.close();
 				} catch (Exception e) {
 					throw new RuntimeException(e);
 				}
 			}
 		}
-		log.info("生成文件结束");
+
+		log.info("需要上传的报销单文件数: {}", reimburseDataListNew.size());
+		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
+		sftpUtil.login();
+		if (sftpUtil.getSftp() == null) {
+			// 登录失败，同步失败
+			SignUtil.sendMsg(constants.CHAT_ID_ARG, constants.USER_ID_ARG, "SFTP登录错误导致报销单更新失败，请查看日志后调用接口手动同步。");
+		} else {
+			List<GenerateEntity> resultSuccessList = new ArrayList<>();
+			List<GenerateEntity> resultFailList = new ArrayList<>();
+			for (GenerateEntity generateEntity : generateEntityList) {
+				boolean result = sftpUtil.upload("expfeishu2sap", generateEntity.getFileName(), generateEntity.getByteArrayOutputStream().toByteArray());
+				if (result) {
+					resultSuccessList.add(generateEntity);
+					log.info("上传CSV文件成功：{}", generateEntity.getFileName());
+				} else {
+					resultFailList.add(generateEntity);
+					log.info("上传CSV文件失败：{}", generateEntity.getFileName());
+				}
+			}
+			log.info("上传成功的报销单文件数: {}", resultSuccessList.size());
+			if (resultSuccessList.size() < reimburseDataListNew.size()) {
+				StringBuilder successFormCodeListStr = new StringBuilder();
+				for (GenerateEntity generateEntitySuccess : resultFailList) {
+					successFormCodeListStr.append(generateEntitySuccess.getFormCode()).append("\n");
+				}
+				StringBuilder failFormCodeListStr = new StringBuilder();
+				for (GenerateEntity generateEntity : resultFailList) {
+					failFormCodeListStr.append(generateEntity.getFormCode()).append("\n");
+				}
+				log.info("生成报销单部分失败。\n成功上传单据号如下：\n" + successFormCodeListStr + "\n失败上传单据号如下：\n" + failFormCodeListStr);
+				SignUtil.sendMsg(constants.CHAT_ID_ARG, constants.USER_ID_ARG,
+						"生成报销单部分失败，请查看日志。\n成功上传单据号如下：\n" + successFormCodeListStr + "\n失败上传单据号如下：\n" + failFormCodeListStr);
+			}
+			log.info("生成文件结束");
+		}
+
 	}
 }

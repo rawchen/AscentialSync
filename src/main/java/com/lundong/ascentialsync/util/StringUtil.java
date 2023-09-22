@@ -1,5 +1,7 @@
 package com.lundong.ascentialsync.util;
 
+import com.lundong.ascentialsync.entity.FeishuUser;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -163,6 +165,54 @@ public class StringUtil {
 			} else {
 				return "";
 			}
+		}
+	}
+
+	/**
+	 * 行事由生成规则：[用户姓名]的[日常报销/差旅报销]-[单据报销事由]
+	 * ER日常，TR差旅
+	 * 如果超过超过20Char用...省略代替
+	 *
+	 * @param feishuUser
+	 * @param formCode
+	 * @param lineDesc
+	 * @return
+	 */
+	public static String generateDocItemText(FeishuUser feishuUser, String formCode, String lineDesc) {
+		String name = "";
+		if (feishuUser != null && feishuUser.getName() != null) {
+			name = feishuUser.getName();
+		}
+
+		if (formCode != null) {
+			if (formCode.startsWith("ER")) {
+				formCode = "日常报销";
+			} else if (formCode.startsWith("TR")) {
+				formCode = "差旅报销";
+			}
+		}
+
+		// 格式：1405258-廉紫-SAP F2020项目，GB0350WW59\n与同行人Jodie分摊
+		// 截取第二个横杠开始到最后
+		if (lineDesc != null) {
+			if ("".equals(lineDesc)) {
+				lineDesc = "";
+			} else {
+				lineDesc = lineDesc.substring(lineDesc.indexOf("-", lineDesc.indexOf("-") + 1) + 1);
+				lineDesc = lineDesc.replaceAll("\n", " ");
+			}
+		}
+
+		String strResult = name + "的" + formCode + "-" + lineDesc;
+
+		if ("".equals(lineDesc)) {
+			strResult = strResult.substring(0, strResult.length() - 1);
+		}
+
+		if (strResult.length() <= 50) {
+			return strResult;
+		} else {
+			return strResult.substring(0, 47) + "...";
 		}
 	}
 }

@@ -752,6 +752,7 @@ public class SignUtil {
 			if (user != null) {
 				// userId jobTitle
 				feishuUser.setUserId(user.getString("user_id"));
+				feishuUser.setName(user.getString("name"));
 				feishuUser.setEmployeeNo(user.getString("employee_no"));
 				// customAttrs
 				JSONArray customAttrs = user.getJSONArray("custom_attrs");
@@ -1034,6 +1035,7 @@ public class SignUtil {
 		if (date != null) {
 			bodyObject.put("update_time_before", TimeUtil.timestampToDateFormat(String.valueOf(TimeUtil.getDailyEndTime(date))));
 			bodyObject.put("update_time_after", TimeUtil.timestampToDateFormat(String.valueOf(TimeUtil.getDailyStartTime(date))));
+//			bodyObject.put("update_time_after", "2023-08-29 20:57:57");
 		}
 		while (true) {
 			String resultStr = HttpRequest.post("https://open.feishu.cn/open-apis/spend/v1/paypools2/scroll?page_token="

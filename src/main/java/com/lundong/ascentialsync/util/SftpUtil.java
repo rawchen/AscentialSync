@@ -2,6 +2,7 @@ package com.lundong.ascentialsync.util;
 
 
 import com.jcraft.jsch.*;
+import lombok.Data;
 import org.apache.commons.io.IOUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -16,6 +17,7 @@ import java.util.Vector;
  * @author RawChen
  * @date 2023-05-12 14:10
  */
+@Data
 public class SftpUtil {
 
 	private Logger logger = LogManager.getLogger(SftpUtil.class);
@@ -151,6 +153,7 @@ public class SftpUtil {
 			sftp.cd(directory);
 		}
 		sftp.put(input, sftpFileName);
+		sftp.cd("..");
 		logger.info("文件上传成功！！ 耗时：{}ms", (System.currentTimeMillis() - start));
 	}
 
@@ -177,11 +180,13 @@ public class SftpUtil {
 	 * @param sftpFileName 上传SFTP服务器后的文件名
 	 * @param bytes        字节数组
 	 */
-	public void upload(String directory, String sftpFileName, byte[] bytes) {
+	public boolean upload(String directory, String sftpFileName, byte[] bytes) {
 		try {
 			upload(directory, sftpFileName, new ByteArrayInputStream(bytes));
+			return true;
 		} catch (SftpException e) {
 			logger.error("上传文件异常！", e);
+			return false;
 		}
 	}
 

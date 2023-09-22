@@ -39,7 +39,7 @@ public class PaypoolServiceImpl implements PaypoolService {
 	 * 同步昨天一天支付池数据
 	 */
 	@Override
-	@Scheduled(cron = "0 0 3 ? * *")
+	@Scheduled(cron = "0 30 8 ? * *")
 	public void syncPaypoolData() {
 		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
 		sftpUtil.login();
