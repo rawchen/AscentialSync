@@ -9,7 +9,6 @@ import com.lundong.ascentialsync.config.Constants;
 import com.lundong.ascentialsync.entity.*;
 import com.lundong.ascentialsync.entity.spend.SpendCustomField;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,52 +41,51 @@ public class SignUtil {
 	}
 
 	/**
-	 * SAP系统自定义签名规则
-	 *
-	 * @param objects
-	 * @param secretKey
-	 * @param requestJson
-	 * @return
-	 */
-	public static String makeMd5Token(Map<String, String> objects, String secretKey, String requestJson) {
-		StringBuilder content = new StringBuilder();
-		content.append(secretKey);
-		// 对 resultmap 中的参数进行排序
-		List<String> keyList = new ArrayList<>();
-		Iterator<Map.Entry<String, String>> ite = objects.entrySet().iterator();
-		while (ite.hasNext()) {
-			keyList.add(ite.next().getKey());
-		}
-		Collections.sort(keyList);
-		// 拼接 secretKey
-		for (String key : keyList) {
-			content.append(key).append(objects.get(key));
-		}
-		content.append(requestJson).append(secretKey);
-		// 生成 md5 签名
-		return DigestUtils.md5Hex(content.toString());
-	}
-
-	/**
 	 * 飞书自建应用获取tenant_access_token
 	 */
 	public static String getAccessToken(String appId, String appSecret) {
 		JSONObject object = new JSONObject();
 		object.put("app_id", appId);
 		object.put("app_secret", appSecret);
-		String resultStr = HttpRequest.post("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal")
-				.form(object)
-				.execute().body();
-		if (StringUtils.isNotEmpty(resultStr)) {
-			JSONObject resultObject = (JSONObject) JSON.parse(resultStr);
-			if (!"0".equals(resultObject.getString("code"))) {
-				return "";
-			} else {
-				String tenantAccessToken = resultObject.getString("tenant_access_token");
-				if (tenantAccessToken != null) {
-					return tenantAccessToken;
+		String resultStr = "";
+		JSONObject resultObject = null;
+		for (int i = 0; i < 3; i++) {
+			try {
+				resultStr = HttpRequest.post("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal")
+						.form(object)
+						.execute().body();
+				if (StringUtils.isNotEmpty(resultStr)) {
+					resultObject = (JSONObject) JSON.parse(resultStr);
+				}
+			} catch (Exception e) {
+				log.error("获取access_token接口请求失败, 重试 {} 次, message: {}, body: {}", i + 1,e.getMessage() , resultStr);
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException ex) {
+					throw new RuntimeException(ex);
 				}
 			}
+			if (resultObject != null) {
+				break;
+			}
+		}
+		// 重试完检测
+		if (resultObject == null) {
+			log.error("重试3次获取access_token后都失败");
+			return "";
+		}
+		if (!"0".equals(resultObject.getString("code"))) {
+			log.error("获取access_token失败: {}", resultObject.getString("msg"));
+			return "";
+		}
+		if ("0".equals(resultObject.getString("code"))) {
+			String tenantAccessToken = resultObject.getString("tenant_access_token");
+			if (tenantAccessToken != null) {
+				return tenantAccessToken;
+			}
+		} else {
+			log.error("access_token获取不成功: {}", resultStr);
+			return "";
 		}
 		return "";
 	}
@@ -638,16 +636,17 @@ public class SignUtil {
 		String resultStr = "";
 		JSONObject jsonObject = null;
 		for (int i = 0; i < 3; i++) {
-			resultStr = HttpRequest.patch("https://open.feishu.cn/open-apis/contact/v3/users/" + user.getUserId() + "?user_id_type=user_id&department_id_type=department_id")
-					.header("Authorization", "Bearer " + accessToken)
-					.form(param)
-					.body(object.toJSONString())
-					.execute()
-					.body();
 			try {
+				resultStr = HttpRequest.patch("https://open.feishu.cn/open-apis/contact/v3/users/" + user.getUserId() + "?user_id_type=user_id&department_id_type=department_id")
+						.header("Authorization", "Bearer " + accessToken)
+						.form(param)
+						.body(object.toJSONString())
+						.execute()
+						.body();
+
 				jsonObject = JSONObject.parseObject(resultStr);
 			} catch (Exception e) {
-				log.error("json解析失败, 重试 {} 次, message: {}, body: {}", i + 1,e.getMessage() , resultStr);
+				log.error("接口请求失败, 重试 {} 次, message: {}, body: {}", i + 1,e.getMessage() , resultStr);
 				try {
 					Thread.sleep(1000);
 				} catch (InterruptedException ex) {
@@ -666,7 +665,7 @@ public class SignUtil {
 		if ("0".equals(jsonObject.getString("code"))) {
 			return true;
 		} else {
-			log.error("接口请求不成功: {}", resultStr + " userId: " + user.getUserId());
+			log.error("员工同步不成功: {}", resultStr + " userId: " + user.getUserId());
 			return false;
 		}
 	}
@@ -977,14 +976,25 @@ public class SignUtil {
 			bodyObject.put("vendor_form_header_code_to", formCode);
 		}
 		while (true) {
-			String resultStr = HttpRequest.post("https://open.feishu.cn/open-apis/spend/v1/paypools2/scroll?page_token="
-							+ (param.get("page_token") == null ? "" : param.get("page_token")))
-					.header("Authorization", "Bearer " + accessToken)
-//					.form(param)
-					.body(bodyObject.toJSONString())
-					.execute()
-					.body();
-			JSONObject jsonObject = JSON.parseObject(resultStr);
+			String resultStr = "";
+			JSONObject jsonObject = null;
+			for (int i = 0; i < 3; i++) {
+				try {
+					resultStr = HttpRequest.post("https://open.feishu.cn/open-apis/spend/v1/paypools2/scroll?page_token="
+									+ (param.get("page_token") == null ? "" : param.get("page_token")))
+							.header("Authorization", "Bearer " + accessToken)
+							//					.form(param)
+							.body(bodyObject.toJSONString())
+							.execute()
+							.body();
+					jsonObject = JSON.parseObject(resultStr);
+				} catch (Exception e) {
+					log.error("接口请求失败，重试 {} 次, message: {}, body: {}", i + 1, e.getMessage(), resultStr);
+				}
+				if (jsonObject != null) {
+					break;
+				}
+			}
 			if (jsonObject != null && "0".equals(jsonObject.getString("code"))) {
 				JSONObject data = (JSONObject) jsonObject.get("data");
 				JSONArray items = (JSONArray) data.get("items");
@@ -1003,6 +1013,8 @@ public class SignUtil {
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
+			} else {
+				break;
 			}
 		}
 		return feishuPaypoolList;
@@ -1035,7 +1047,8 @@ public class SignUtil {
 		if (date != null) {
 			bodyObject.put("update_time_before", TimeUtil.timestampToDateFormat(String.valueOf(TimeUtil.getDailyEndTime(date))));
 			bodyObject.put("update_time_after", TimeUtil.timestampToDateFormat(String.valueOf(TimeUtil.getDailyStartTime(date))));
-//			bodyObject.put("update_time_after", "2023-08-29 20:57:57");
+//			bodyObject.put("update_time_after", "2023-09-21 00:00:00");
+//			bodyObject.put("update_time_before", "2023-09-22 23:59:59");
 		}
 		while (true) {
 			String resultStr = HttpRequest.post("https://open.feishu.cn/open-apis/spend/v1/paypools2/scroll?page_token="

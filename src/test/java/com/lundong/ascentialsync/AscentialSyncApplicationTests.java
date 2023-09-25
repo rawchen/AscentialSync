@@ -198,4 +198,11 @@ class AscentialSyncApplicationTests {
 		}
 	}
 
+	@Test
+	void testGetAccessToken() {
+		// 重试
+		String accessToken = SignUtil.getAccessToken("cli_a46e3ddc147b900e", "324kibvjVE7W8zKwSVRfcfSlbeI5W8qa");
+		System.out.println("accessToken: " + accessToken);
+	}
+
 }
