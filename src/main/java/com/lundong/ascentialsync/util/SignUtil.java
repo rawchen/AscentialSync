@@ -987,12 +987,27 @@ public class SignUtil {
 							.body(bodyObject.toJSONString())
 							.execute()
 							.body();
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					System.out.println(resultStr);
 					jsonObject = JSON.parseObject(resultStr);
 				} catch (Exception e) {
 					log.error("接口请求失败，重试 {} 次, message: {}, body: {}", i + 1, e.getMessage(), resultStr);
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException ecp) {
+						ecp.printStackTrace();
+					}
 				}
 				if (jsonObject != null) {
-					break;
+					if ("99991400".equals(jsonObject.getString("code"))) {
+						log.error("接口请求失败，将重试: {}", resultStr);
+					} else {
+						break;
+					}
 				}
 			}
 			if (jsonObject != null && "0".equals(jsonObject.getString("code"))) {
@@ -1007,11 +1022,6 @@ public class SignUtil {
 					param.put("page_token", data.getString("page_token"));
 				} else {
 					break;
-				}
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
 				}
 			} else {
 				break;

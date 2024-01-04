@@ -1,6 +1,11 @@
 package com.lundong.ascentialsync;
 
+import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.http.HttpRequest;
+import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.context.AnalysisContext;
+import com.alibaba.excel.read.listener.ReadListener;
+import com.alibaba.excel.support.ExcelTypeEnum;
 import com.alibaba.fastjson.JSONObject;
 import com.lundong.ascentialsync.config.Constants;
 import com.lundong.ascentialsync.entity.*;
@@ -13,13 +18,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @SpringBootTest
@@ -112,7 +117,7 @@ class AscentialSyncApplicationTests {
 
 	@Test
 	void getPaypools() {
-		List<FeishuPaypool> paypools = SignUtil.getPaypools(null);
+		List<FeishuPaypool> paypools = SignUtil.getPaypools("ER23100100001");
 		System.out.println("size: " + paypools.size());
 		for (FeishuPaypool paypool : paypools) {
 			System.out.println(paypool);
@@ -203,6 +208,57 @@ class AscentialSyncApplicationTests {
 		// 重试
 		String accessToken = SignUtil.getAccessToken("cli_a46e3ddc147b900e", "324kibvjVE7W8zKwSVRfcfSlbeI5W8qa");
 		System.out.println("accessToken: " + accessToken);
+	}
+
+	@Test
+	void testPayPoolList() throws IOException {
+//		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
+//		sftpUtil.login();
+		String fileName = "PaymentRunReport_" + LocalDateTimeUtil.format(LocalDate.now().minusDays(1), "ddMMyyyy") + ".csv";
+		InputStream inputStream = Files.newInputStream(new File("/Users/rawchen/Downloads/PaymentRunReport_14102023.csv").toPath());
+		if (inputStream == null) {
+			log.info("无昨日支付同步数据：{}", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+			return;
+		}
+		// Excel列表数据查询
+		ArrayList<ExcelPaypool> excelPaypools = new ArrayList<>();
+		try {
+			ArrayList<ExcelPaypool> finalExcelPaypools = excelPaypools;
+			EasyExcel.read(inputStream, ExcelPaypool.class, new ReadListener<ExcelPaypool>() {
+				@Override
+				public void invoke(ExcelPaypool paypool, AnalysisContext context) {
+					finalExcelPaypools.add(paypool);
+				}
+				@Override
+				public void doAfterAllAnalysed(AnalysisContext context) {
+				}
+			}).excelType(ExcelTypeEnum.CSV).sheet().headRowNumber(1).doRead();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+//		System.out.println(excelPaypools.size());
+		excelPaypools = excelPaypools.stream().collect(
+				Collectors.collectingAndThen(Collectors.toCollection(() -> new TreeSet<>(
+								Comparator.comparing(ExcelPaypool::getDocumentReferenceId))),
+						ArrayList::new));
+		log.info("提取单据的支付数: {}", excelPaypools.size());
+
+		// 通过单据查看支付池id
+		List<FeishuPaypool> payPoolList = new ArrayList<>();
+
+		for (ExcelPaypool excelPaypool : excelPaypools) {
+			List<FeishuPaypool> paypools = SignUtil.getPaypools(excelPaypool.getDocumentReferenceId());
+			for (FeishuPaypool paypool : paypools) {
+				// A1待支付 A3支付中 A5支付成功
+				if ("A1".equals(paypool.getPaymentStatusCode())) {
+					payPoolList.add(new FeishuPaypool().setId(paypool.getId()).setAccountant(paypool.getAccountant()));
+				}
+			}
+		}
+		payPoolList = payPoolList.stream().collect(
+				Collectors.collectingAndThen(Collectors.toCollection(() -> new TreeSet<>(
+						Comparator.comparing(FeishuPaypool::getId))),ArrayList::new));
+		log.info("在待支付的支付池: {}", payPoolList.size());
 	}
 
 }

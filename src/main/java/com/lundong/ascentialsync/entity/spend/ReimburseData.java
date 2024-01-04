@@ -15,6 +15,9 @@ public class ReimburseData {
 	@JSONField(name = "allocations")
 	private List<Allocation> allocations;
 
+	@JSONField(name = "pay_pool_logs")
+	private List<PayPoolLog> payPoolLogs;
+
 	/**
 	 * 发票报销行
 	 */
