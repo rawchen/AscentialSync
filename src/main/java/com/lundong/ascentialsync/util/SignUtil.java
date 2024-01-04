@@ -58,15 +58,22 @@ public class SignUtil {
 					resultObject = (JSONObject) JSON.parse(resultStr);
 				}
 			} catch (Exception e) {
-				log.error("获取access_token接口请求失败, 重试 {} 次, message: {}, body: {}", i + 1,e.getMessage() , resultStr);
+				log.error("获取access_token接口请求异常, 重试 {} 次, message: {}, body: {}", i + 1,e.getMessage() , resultStr);
 				try {
 					Thread.sleep(1000);
 				} catch (InterruptedException ex) {
-					throw new RuntimeException(ex);
+					log.error("sleep异常", ex);
 				}
 			}
-			if (resultObject != null) {
+			if (resultObject != null && "0".equals(resultObject.getString("code"))) {
 				break;
+			} else {
+				log.error("获取access_token接口请求失败, 重试 {} 次, body: {}", i + 1, resultStr);
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException ex) {
+					log.error("sleep异常", ex);
+				}
 			}
 		}
 		// 重试完检测
@@ -221,7 +228,7 @@ public class SignUtil {
 					}
 				}
 				try {
-					Thread.sleep(100);
+					Thread.sleep(1000);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -1040,6 +1047,46 @@ public class SignUtil {
 		return getPaypools(accessToken, formCode);
 	}
 
+	public static FeishuPaypool getPaypoolDetail(String id) {
+		String accessToken = getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU);
+		String resultStr = "";
+		JSONObject jsonObject = null;
+		for (int i = 0; i < 3; i++) {
+			try {
+				resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/spend/v1/paypools2/" + id)
+						.header("Authorization", "Bearer " + accessToken)
+						.execute()
+						.body();
+//				System.out.println(resultStr);
+				jsonObject = JSON.parseObject(resultStr);
+			} catch (Exception e) {
+				log.error("接口请求异常，重试 {} 次, message: {}, body: {}", i + 1, e.getMessage(), resultStr);
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException ecp) {
+					log.error("sleep异常", ecp);
+				}
+			}
+			if (jsonObject != null && "0".equals(jsonObject.getString("code"))) {
+				break;
+			} else {
+				log.error("接口请求失败，重试 {} 次, body: {}", i + 1, resultStr);
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException ecp) {
+					log.error("sleep异常", ecp);
+				}
+			}
+		}
+		if (jsonObject != null && "0".equals(jsonObject.getString("code"))) {
+			JSONObject data = jsonObject.getJSONObject("data").getJSONObject("pay_pool");
+			FeishuPaypool paypool = data.toJavaObject(FeishuPaypool.class);
+			return paypool;
+		} else {
+			return null;
+		}
+	}
+
 	/**
 	 * 遍历支付池获取单据号列表
 	 *
@@ -1124,7 +1171,7 @@ public class SignUtil {
 				.execute()
 				.body();
 		try {
-			Thread.sleep(500);
+			Thread.sleep(1000);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
@@ -1138,7 +1185,7 @@ public class SignUtil {
 				.execute()
 				.body();
 		try {
-			Thread.sleep(500);
+			Thread.sleep(1000);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}

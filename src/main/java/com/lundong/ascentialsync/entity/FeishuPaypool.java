@@ -1,8 +1,11 @@
 package com.lundong.ascentialsync.entity;
 
 import com.alibaba.fastjson.annotation.JSONField;
+import com.lundong.ascentialsync.entity.spend.PayPoolLog;
 import lombok.Data;
 import lombok.experimental.Accessors;
+
+import java.util.List;
 
 @Data
 @Accessors(chain = true)
@@ -48,4 +51,7 @@ public class FeishuPaypool {
      */
     @JSONField(name = "vendor_form_header_code")
     private String vendorFormHeaderCode;
+
+    @JSONField(name = "pay_pool_logs")
+    private List<PayPoolLog> payPoolLogs;
 }

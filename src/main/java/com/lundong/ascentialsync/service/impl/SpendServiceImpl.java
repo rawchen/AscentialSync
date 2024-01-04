@@ -181,24 +181,33 @@ public class SpendServiceImpl implements SpendService {
 					throw new RuntimeException(e);
 				}
 
-				String logCreateTimeStr = "";
 				Date logCreateTime = new Date();
-				List<PayPoolLog> payPoolLogs = form.getPayPoolLogs();
-				for (PayPoolLog payPoolLog : payPoolLogs) {
-					if ("N3".equals(payPoolLog.getAfterValue())) {
-						logCreateTimeStr = payPoolLog.getCreateTime();
-						break;
+				String formCode = form.getFormCode();
+				for (FeishuPaypool feishuPaypool : paypoolList) {
+					if (feishuPaypool.getVendorFormHeaderCode().equals(formCode)) {
+						// 根据feishuPaypool的支付池ID查接口
+						FeishuPaypool paypool = SignUtil.getPaypoolDetail(feishuPaypool.getId());
+						if (paypool != null) {
+							List<PayPoolLog> payPoolLogs = paypool.getPayPoolLogs();
+							String logCreateTimeStr = "";
+							for (PayPoolLog payPoolLog : payPoolLogs) {
+								if ("N3".equals(payPoolLog.getAfterValue())) {
+									logCreateTimeStr = payPoolLog.getCreateTime();
+									break;
+								}
+							}
+							try {
+								if (!StrUtil.isEmpty(logCreateTimeStr)) {
+									logCreateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(logCreateTimeStr);
+								} else {
+									log.error("pay_pool_logs中找不到afterValue为N3的项");
+									logCreateTime = approvedTime;
+								}
+							} catch (ParseException e) {
+								log.info("格式化时间异常", e);
+							}
+						}
 					}
-				}
-				try {
-					if (!StrUtil.isEmpty(logCreateTimeStr)) {
-						logCreateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(logCreateTimeStr);
-					} else {
-                        log.info("pay_pool_logs中找不到afterValue为N3的项");
-						logCreateTime = approvedTime;
-					}
-				} catch (ParseException e) {
-					log.info("格式化时间异常", e);
 				}
 
 				// 通过获取的单据生成表头
