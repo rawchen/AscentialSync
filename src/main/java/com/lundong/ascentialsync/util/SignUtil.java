@@ -592,6 +592,11 @@ public class SignUtil {
 					} else {
 						break;
 					}
+					try {
+						Thread.sleep(1500);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
 				} else {
 					break;
 				}
