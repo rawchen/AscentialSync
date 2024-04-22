@@ -573,6 +573,11 @@ public class SignUtil {
 						.form(param)
 						.execute()
 						.body();
+				try {
+					Thread.sleep(500);
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
 //			System.out.println(resultStr);
 				JSONObject jsonObject = JSON.parseObject(resultStr);
 				if (!"0".equals(jsonObject.getString("code"))) {
@@ -936,30 +941,59 @@ public class SignUtil {
 	 */
 	public static List<SpendCustomField> getSpendCustomFields(String accessToken, String fieldCode) {
 		List<SpendCustomField> spendCustomFields = new ArrayList<>();
-		String resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/spend/v1/custom_fields/" + fieldCode)
-				.header("Authorization", "Bearer " + accessToken)
-				.execute()
-				.body();
-		JSONObject jsonObject = JSON.parseObject(resultStr);
-		if (jsonObject != null && "0".equals(jsonObject.getString("code"))) {
+
+		String resultStr = "";
+		JSONObject jsonObject = null;
+
+		for (int i = 0; i < 3; i++) {
+			try {
+				resultStr = HttpRequest.get("https://open.feishu.cn/open-apis/spend/v1/custom_fields/" + fieldCode)
+						.header("Authorization", "Bearer " + accessToken)
+						.execute()
+						.body();
+				jsonObject = JSON.parseObject(resultStr);
+
+			} catch (Exception e) {
+				log.error("接口请求异常，重试 {} 次, message: {}, body: {}", i + 1, e.getMessage(), resultStr);
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException ecp) {
+					log.error("sleep error: {}", ecp.getMessage());
+				}
+			}
+			if (jsonObject == null || jsonObject.getInteger("code") != 0) {
+				log.error("接口请求失败，重试 {} 次, body: {}", i + 1, resultStr);
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException ecp) {
+					log.error("sleep error: {}", ecp.getMessage());
+				}
+			} else {
+				break;
+			}
+		}
+
+		if (jsonObject != null && jsonObject.getInteger("code") == 0) {
 			JSONObject data = (JSONObject) jsonObject.get("data");
 			JSONArray items = (JSONArray) data.get("value_list");
 			for (int i = 0; i < items.size(); i++) {
-				// 构造飞书用户
 				SpendCustomField customField = new SpendCustomField();
 				customField.setCode(items.getJSONObject(i).getString("code"));
 				customField.setNameI18n(items.getJSONObject(i).getString("name_i18n"));
 				customField.setIsValid(items.getJSONObject(i).getBoolean("is_valid"));
 				spendCustomFields.add(customField);
 			}
+			// 解析此格式：{\"zh\":\"61007030\"}
+			for (SpendCustomField spendCustomField : spendCustomFields) {
+				spendCustomField.setNameI18n(StringUtil.getZhCustomFie(spendCustomField.getNameI18n()));
+			}
+			// 过滤有效的
+			spendCustomFields = spendCustomFields.stream().filter(SpendCustomField::getIsValid).collect(Collectors.toList());
+			return spendCustomFields;
+		} else {
+			log.error("接口请求失败，body: {}", resultStr);
+			return Collections.emptyList();
 		}
-		// 解析此格式：{\"zh\":\"61007030\"}
-		for (SpendCustomField spendCustomField : spendCustomFields) {
-			spendCustomField.setNameI18n(StringUtil.getZhCustomFie(spendCustomField.getNameI18n()));
-		}
-		// 过滤有效的
-		spendCustomFields = spendCustomFields.stream().filter(SpendCustomField::getIsValid).collect(Collectors.toList());
-		return spendCustomFields;
 	}
 
 	/**

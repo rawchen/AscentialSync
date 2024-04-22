@@ -9,6 +9,7 @@ import com.alibaba.excel.support.ExcelTypeEnum;
 import com.alibaba.fastjson.JSONObject;
 import com.lundong.ascentialsync.config.Constants;
 import com.lundong.ascentialsync.entity.*;
+import com.lundong.ascentialsync.entity.spend.SpendCustomField;
 import com.lundong.ascentialsync.util.ExcelUtil;
 import com.lundong.ascentialsync.util.SftpUtil;
 import com.lundong.ascentialsync.util.SignUtil;
@@ -259,6 +260,14 @@ class AscentialSyncApplicationTests {
 				Collectors.collectingAndThen(Collectors.toCollection(() -> new TreeSet<>(
 						Comparator.comparing(FeishuPaypool::getId))),ArrayList::new));
 		log.info("在待支付的支付池: {}", payPoolList.size());
+	}
+
+	@Test
+	 void testGetSpendCustomFields() {
+		List<SpendCustomField> spendCustomFields = SignUtil.getSpendCustomFields(SignUtil.getAccessToken(constants.APP_ID_FEISHU, constants.APP_SECRET_FEISHU), "0000002");
+		for (SpendCustomField spendCustomField : spendCustomFields) {
+			System.out.println(spendCustomField);
+		}
 	}
 
 }
