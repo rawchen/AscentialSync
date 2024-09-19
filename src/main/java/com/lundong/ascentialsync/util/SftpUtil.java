@@ -98,7 +98,7 @@ public class SftpUtil {
 				session.setPassword(password);
 			}
 			//优先使用 password 验证   注：session.connect()性能低，使用password验证可跳过gssapi认证，提升连接服务器速度
-			session.setConfig("PreferredAuthentications", "password");
+			session.setConfig("PreferredAuthentications", "publickey,password");
 			//设置第一次登陆的时候提示，可选值：(ask | yes | no)
 			session.setConfig("StrictHostKeyChecking", "no");
 			session.connect();
@@ -265,7 +265,7 @@ public class SftpUtil {
 	}
 
 	/**
-	 * 移动目录指定文件到目录下的.archive下
+	 * 移动目录指定文件到目录下的archive下
 	 *
 	 * @param directory
 	 * @param fileName
@@ -275,14 +275,38 @@ public class SftpUtil {
 			sftp.cd(directory);
 			try {
 				//如果文件夹不存在，则创建文件夹
-				if (sftp.ls("/" + directory + "/.archive/") == null) {
-					sftp.mkdir("/" + directory + "/.archive/");
+				if (sftp.ls(directory + "/archive/") == null) {
+					sftp.mkdir(directory + "/archive/");
 				}
 			} catch (SftpException e) {
 				//创建不存在的文件夹，并切换到文件夹
-				sftp.mkdir("/" + directory + "/.archive/");
+				sftp.mkdir(directory + "/archive/");
 			}
-			sftp.rename("/" + directory + "/" + fileName, "/" + directory + "/.archive/" + fileName);
+			sftp.rename(directory + "/" + fileName, directory + "/archive/" + fileName);
+		} catch (SftpException e) {
+			logger.error("文件移动异常！", e);
+		}
+	}
+
+	/**
+	 * 移动目录指定文件到目录下的archive下
+	 *
+	 * @param directory
+	 * @param fileName
+	 */
+	public void moveFile(String directory, String dirOutPath, String fileName) {
+		try {
+			sftp.cd(directory);
+			try {
+				//如果文件夹不存在，则创建文件夹
+				if (sftp.ls(dirOutPath) == null) {
+					sftp.mkdir(dirOutPath);
+				}
+			} catch (SftpException e) {
+				//创建不存在的文件夹，并切换到文件夹
+				sftp.mkdir(dirOutPath);
+			}
+			sftp.rename(directory + "/" + fileName, dirOutPath + "/" + fileName);
 		} catch (SftpException e) {
 			logger.error("文件移动异常！", e);
 		}
@@ -334,8 +358,8 @@ public class SftpUtil {
 			if (isDirExist(directory)) {
 				Vector<?> vector = sftp.ls(directory);
 				//移除上级目录和根目录："." ".."
-				vector.remove(0);
-				vector.remove(0);
+//				vector.remove(0);
+//				vector.remove(0);
 				return vector;
 			}
 		} catch (SftpException e) {

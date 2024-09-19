@@ -23,10 +23,16 @@ public class Constants {
 
 	public String SFTP_USER_ID;
 
+	public String SFTP_PRIVATE_KEY_PATH;
+
 	public String SFTP_PASSWORD;
 
 	public String CHAT_ID_ARG;
 
 	public String USER_ID_ARG;
+
+	public static final String FILE_LIBRARY_PREFIX_DEV = "/CPI/exp_to_SAP/DEV/";
+
+	public static final String FILE_LIBRARY_PREFIX_PROD = "/CPI/exp_to_SAP/PROD/";
 
 }

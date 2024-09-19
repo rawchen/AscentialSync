@@ -41,10 +41,10 @@ public class PaypoolServiceImpl implements PaypoolService {
 	@Override
 	@Scheduled(cron = "0 30 8 ? * *")
 	public void syncPaypoolData() {
-		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
+		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PRIVATE_KEY_PATH, 22, constants.SFTP_HOST);
 		sftpUtil.login();
 		String fileName = "PaymentRunReport_" + LocalDateTimeUtil.format(LocalDate.now().minusDays(1), "ddMMyyyy") + ".csv";
-		InputStream inputStream = sftpUtil.downloadStream("pmtrepsap2feishu", fileName);
+		InputStream inputStream = sftpUtil.downloadStream(Constants.FILE_LIBRARY_PREFIX_DEV + "pmtrepsap2feishu", fileName);
 		if (inputStream == null) {
 			log.info("无昨日支付同步数据：{}", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
 			return;
@@ -100,9 +100,9 @@ public class PaypoolServiceImpl implements PaypoolService {
 					"，修改成功的单据数：" + resultFilterList.size());
 		}
 
-		SftpUtil sftpUtilNew = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
+		SftpUtil sftpUtilNew = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PRIVATE_KEY_PATH, 22, constants.SFTP_HOST);
 		sftpUtilNew.login();
-		sftpUtilNew.moveFile("pmtrepsap2feishu", fileName);
+		sftpUtilNew.moveFile(Constants.FILE_LIBRARY_PREFIX_DEV + "pmtrepsap2feishu", fileName);
 
 		log.info("支付池支付状态更新结束。");
 	}

@@ -41,10 +41,10 @@ public class StaffServiceImpl implements StaffService {
 	@Override
 	@Scheduled(cron = "0 0 1 ? * *")
 	public void syncStaffData() {
-		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
+		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PRIVATE_KEY_PATH, 22, constants.SFTP_HOST);
 		sftpUtil.login();
 		String fileName = "WorkdayFeishu_" + LocalDateTimeUtil.format(LocalDate.now().minusDays(1), "ddMMyyyy") + ".csv";
-		InputStream inputStream = sftpUtil.downloadStream("workday2feishu", fileName);
+		InputStream inputStream = sftpUtil.downloadStream(Constants.FILE_LIBRARY_PREFIX_DEV + "workday2feishu", fileName);
 		if (inputStream == null) {
 			log.info("无昨日员工同步数据：{}", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
 			return;
@@ -114,9 +114,9 @@ public class StaffServiceImpl implements StaffService {
 		}
 		if (resultFilterList.size() > 0) {
 			// 至少成功修改一个用户的数据
-			SftpUtil sftpUtilNew = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
+			SftpUtil sftpUtilNew = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PRIVATE_KEY_PATH, 22, constants.SFTP_HOST);
 			sftpUtilNew.login();
-			sftpUtilNew.moveFile("workday2feishu", fileName);
+			sftpUtilNew.moveFile(Constants.FILE_LIBRARY_PREFIX_DEV + "workday2feishu", fileName);
 		}
 	}
 }

@@ -10,11 +10,14 @@ custom:
   app-secret-feishu: kNm1sLuPc6hS2yNDXNxxxxxxxxxxxxxxxx
   # SFTP主机
   sftp-host: xxx
+  # SFTP私钥文件路径
+  sftp-private-key-path: /usr/local/AscentialSync/Feishu_Kiteworks_Fly_SSH_Private.txt
   # SFTP用户
-  sftp-user-id: xxx
+#  sftp-user-id: sapchina-pr
+  sftp-user-id: svc.kiteworks.fly.cpi.de@omc.oneds.com
   # SFTP密码
-  sftp-password: xxx
+  sftp-password: CUP_food_LAP_12
   # 警告接收群ID （获取chat_id：https://open.feishu.cn/document/server-docs/group/chat/chat-id-description）
-  chat-id-arg:
+  chat-id-arg: oc_eb2a397eff703aa863b1a60ccc3579ba
   # 警告接收人ID （获取user_id：https://open.feishu.cn/document/server-docs/contact-v3/user/batch_get_id）
   user-id-arg:

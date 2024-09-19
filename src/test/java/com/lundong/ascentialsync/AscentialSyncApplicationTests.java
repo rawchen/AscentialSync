@@ -1,6 +1,7 @@
 package com.lundong.ascentialsync;
 
 import cn.hutool.core.date.LocalDateTimeUtil;
+import cn.hutool.core.io.IoUtil;
 import cn.hutool.http.HttpRequest;
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.context.AnalysisContext;
@@ -19,7 +20,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
@@ -268,6 +272,26 @@ class AscentialSyncApplicationTests {
 		for (SpendCustomField spendCustomField : spendCustomFields) {
 			System.out.println(spendCustomField);
 		}
+	}
+
+	@Test
+	void testSFTP() {
+		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PRIVATE_KEY_PATH, 22, constants.SFTP_HOST);
+//		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, "/Users/rawchen/Feishu_Kiteworks_Fly_SSH_Private.txt", 22, constants.SFTP_HOST);
+		sftpUtil.login();
+//		sftpUtil.moveFile("workday2feishu", "WorkdayFeishu_10072023.csv");
+//		sftpUtil.upload("/CPI/exp_to_SAP/DEV", "123456.txt", "123456", "UTF-8");
+
+//		Vector<?> objects = sftpUtil.listFiles(Constants.FILE_LIBRARY_PREFIX_DEV + "expsap2feishu");
+//		objects.forEach(System.out::println);
+//		sftpUtil.moveFile(Constants.FILE_LIBRARY_PREFIX_DEV, Constants.FILE_LIBRARY_PREFIX_DEV + "pmtrepsap2feishu", "123456.txt");
+//		sftpUtil.moveFile(Constants.FILE_LIBRARY_PREFIX_DEV + "pmtrepsap2feishu", "123456.txt");
+//		Vector<?> objects2 = sftpUtil.listFiles(Constants.FILE_LIBRARY_PREFIX_DEV + "pmtrepsap2feishu/archive");
+//		objects2.forEach(System.out::println);
+
+		InputStream inputStream = sftpUtil.downloadStream(Constants.FILE_LIBRARY_PREFIX_DEV + "pmtrepsap2feishu/archive", "123456.txt");
+		String read = IoUtil.read(inputStream, StandardCharsets.UTF_8);
+		System.out.println(read);
 	}
 
 }

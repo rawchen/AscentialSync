@@ -752,7 +752,7 @@ public class SpendServiceImpl implements SpendService {
 		}
 
 		log.info("需要上传的报销单文件数: {}", reimburseDataListNew.size());
-		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PASSWORD, constants.SFTP_HOST, 22);
+		SftpUtil sftpUtil = new SftpUtil(constants.SFTP_USER_ID, constants.SFTP_PRIVATE_KEY_PATH, 22, constants.SFTP_HOST);
 		sftpUtil.login();
 		if (sftpUtil.getSftp() == null) {
 			// 登录失败，同步失败
@@ -761,7 +761,7 @@ public class SpendServiceImpl implements SpendService {
 			List<GenerateEntity> resultSuccessList = new ArrayList<>();
 			List<GenerateEntity> resultFailList = new ArrayList<>();
 			for (GenerateEntity generateEntity : generateEntityList) {
-				boolean result = sftpUtil.upload("expfeishu2sap", generateEntity.getFileName(), generateEntity.getByteArrayOutputStream().toByteArray());
+				boolean result = sftpUtil.upload(Constants.FILE_LIBRARY_PREFIX_DEV + "expfeishu2sap", generateEntity.getFileName(), generateEntity.getByteArrayOutputStream().toByteArray());
 				if (result) {
 					resultSuccessList.add(generateEntity);
 					log.info("上传CSV文件成功：{}", generateEntity.getFileName());
